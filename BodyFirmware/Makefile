@@ -5,5 +5,5 @@ GITHUB_REPOS=adafruit/Adafruit_BNO055 \
 adafruit/Adafruit_Neopixel \
 adafruit/Adafruit_Sensor \
 reeltwo/Reeltwo \
-rimim/USBSabertooth
+rimim/USBSabertooth_NB
 include ../Arduino.mk
