@@ -1,0 +1,11 @@
+[Unit]
+Description=RSeries TestBed Service
+
+[Service]
+WorkingDirectory=/home/pi/reeltwo/R2D2/smq
+ExecStart=/home/pi/reeltwo/R2D2/smq/bin/smq_agent /dev/ttyUSB0
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=TestBed
+
+Restart=always
