@@ -23,6 +23,7 @@
 #include "Orientation.h"
 #include "ServoDispatchPCA9685.h"
 #include "ServoSequencer.h"
+#include "ServoFeedback.h"
 
 #include "core/JawaCommander.h"
 
@@ -75,6 +76,10 @@ const ServoSettings servoSettings[] PROGMEM = {
     { 0,     0,    0, 0  },  /* 15: unused */
     { 17, 1250, 1900, PANEL_GROUP_10|TOP_PIE_PANEL },  /* 16: pie panel 1 */
 };
+const uint8_t servoFeedbackPins[] PROGMEM = {
+    A0,
+    A1
+};
 // Pump 8
 BadMotivator badMotivator(8);
 FireStrip fireStrip(9);
@@ -83,14 +88,16 @@ ServoSequencer servoSequencer(servoDispatch);
 HoloLights frontHolo(2, HoloLights::kRGB);
 HoloLights rearHolo(3, HoloLights::kRGB);
 HoloLights topHolo(4, HoloLights::kRGB);
-LogicEngineDeathStarFLD<> FLD(1, LogicEngineFLDDefault);
-LogicEngineDeathStarRLDStaggerOdd<> RLD(2, LogicEngineRLDDefault);
+LogicEngineDeathStarFLD<> FLD(LogicEngineFLDDefault);
+LogicEngineDeathStarRLDStaggerOdd<> RLD(LogicEngineRLDDefault);
 JawaCommander<> jawaCommander;
 
 LedControlMAX7221<3> ledChain1(CBI_DATAIN_PIN, CBI_CLOCK_PIN, CBI_LOAD_PIN);
 ChargeBayIndicator chargeBayIndicator(ledChain1);
 DataPanel dataPanel(ledChain1);
 TeecesPSI somePSI(ledChain1);
+
+ServoFeedback<SizeOfArray(servoFeedbackPins)> servoFeedback(servoFeedbackPins);
 
 AnimationPlayer player(servoSequencer);
 
