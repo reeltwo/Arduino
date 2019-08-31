@@ -214,7 +214,7 @@ void setup()
     // DelayCall::schedule([] { closeCPUARM(); closeLeftBodyDoor(); closeChargeBayDoor(); closeDataPanelDoor(); }, 12000);
 }
 
-long lastTime;
+uint32_t lastTime;
 void loop()
 {
     AnimatedEvent::process();
