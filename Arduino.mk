@@ -55,6 +55,8 @@ AVRDUDE_OPTS += -q
 endif
 BUILDER_CMD=$(ARDUINO_BUILDER) -hardware $(ARDUINO_HARDWARE) -tools $(ARDUINO_TOOLS) -tools $(BUILDER_TOOLS) -libraries $(SYSTEM_LIBRARIES) -libraries $(PROJECT_LIBRARIES) $(GITHUB_LIBRARIES) -fqbn arduino:avr:$(ARDUINO_FQBN) $(ARDUINO_OPTS) 
 
+SSH_UPLOAD_USER := pi
+
 # Check to see if we have a host specific override file for PORT variable
 ifneq ("$(HOSTPROPS)", "")
 include $(HOSTPROPS)
@@ -93,8 +95,9 @@ build: github_clone .build/$(SKETCH).ino.hex
 upload:
 ifneq ("$(SSH_UPLOAD_HOST)", "")
 	@echo "\nUploading to $(SSH_UPLOAD_HOST)"
-	scp .build/$(SKETCH).ino.hex pi@$(SSH_UPLOAD_HOST):roms
-	ssh pi@$(SSH_UPLOAD_HOST) roms/flash.sh $(SKETCH)
+	scp .build/$(SKETCH).ino.hex $(SSH_UPLOAD_USER)@$(SSH_UPLOAD_HOST):roms
+
+	ssh $(SSH_UPLOAD_USER)@$(SSH_UPLOAD_HOST) roms/flash.sh $(SKETCH)
 	@echo
 else
 	@echo "\nUploading on $(HOSTNAME)"
