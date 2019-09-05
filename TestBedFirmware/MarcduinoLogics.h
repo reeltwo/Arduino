@@ -42,20 +42,70 @@ MARCDUINO_ACTION(DiscoLogicsSequence, @0T92, ({
 
 ////////////////
 
+static char sTFLDText[32];
+static char sBFLDText[32];
+static char sFLDText[65];
+static char sRLDText[64];
+
 MARCDUINO_ACTION(TFLDScrollTextLeft, @1M, ({
-    FLD.selectScrollTextLeft(Marcduino::getCommand());
+    strcpy(sTFLDText, Marcduino::getCommand());
+    strcpy(sFLDText, sTFLDText);
+    strcat(sFLDText, "\n");
+    strcat(sFLDText, sBFLDText);
+    FLD.selectScrollTextLeft(sFLDText, FLD.randomColor());
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(BFLDScrollTextLeft, @2M, ({
-    FLD.selectScrollTextLeft(Marcduino::getCommand());
+    strcpy(sBFLDText, Marcduino::getCommand());
+    strcpy(sFLDText, sTFLDText);
+    strcat(sFLDText, "\n");
+    strcat(sFLDText, sBFLDText);
+    FLD.selectScrollTextLeft(sFLDText, FLD.randomColor());
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(RLDScrollTextLeft, @3M, ({
-    RLD.selectScrollTextLeft(Marcduino::getCommand());
+    strcpy(sRLDText, Marcduino::getCommand());
+    RLD.selectScrollTextLeft(sRLDText, RLD.randomColor());
+}))
+
+////////////////
+
+MARCDUINO_ACTION(TFLDTextLatin, @1P60, ({
+    FLD.setEffectFontNum(0);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(BFLDTextLatin, @2P60, ({
+    FLD.setEffectFontNum(0);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(RLDTextLatin, @3P60, ({
+    RLD.setEffectFontNum(0);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(TFLDTextAurabesh, @1P61, ({
+    FLD.setEffectFontNum(1);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(BFLDTextAurabesh, @2P61, ({
+    FLD.setEffectFontNum(1);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(RLDTextAurabesh, @3P61, ({
+    RLD.setEffectFontNum(1);
 }))
 
 ////////////////

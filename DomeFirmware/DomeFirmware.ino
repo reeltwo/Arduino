@@ -1,4 +1,4 @@
-#define USE_DEBUG
+// #define USE_DEBUG
 // #define USE_SERVO_DEBUG
 
 // PINOUT
@@ -22,6 +22,7 @@
 // D6  - REAR_LOGIC
 // D7  - OUTPUT_ENABLED_PIN
 // D8  - SMOKE_PIN
+// D9  - Rear Neo PSI
 
 
 // D53 - SDCS (SC) (Gray Wire)
@@ -37,6 +38,7 @@
 #include "dome/HoloLights.h"
 #include "dome/HoloDisplay.h"
 #include "dome/Logics.h"
+#include "dome/NeoPSI.h"
 #include "dome/BadMotivator.h"
 #include "MicrophoneAmplitude.h"
 #include "i2c/PeriscopeI2C.h"
@@ -58,6 +60,7 @@
 // D6  - REAR_LOGIC
 #define OUTPUT_ENABLED_PIN  7
 #define SMOKE_PIN           8
+#define REAR_NEOPSI_PIN     9
 
 #define SMALL_PANEL         0x0001
 #define MEDIUM_PANEL        0x0002
@@ -131,6 +134,7 @@ PeriscopeI2C periscope;
 MagicPanelI2C magicPanel;
 Orientation orientation;
 BadMotivator badMotivator(SMOKE_PIN);
+NeoRearPSI<REAR_NEOPSI_PIN> rearPSI(LogicEngineRearPSIDefault);
 
 AnimationPlayer player(servoSequencer);
 JawaCommander<> jawaCommander;
@@ -193,7 +197,7 @@ void setup()
 
     DelayCall::schedule([] { Marcduino::send(F("$73")); }, 1000);
 
-    frontHolo.play("Leia.b2d");
+    frontHolo.play("LEIA.BD2");
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
 }
 

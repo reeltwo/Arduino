@@ -1,5 +1,6 @@
 TARGET=Mega2560
 SSH_UPLOAD_HOST=r2p2
+#SSH_UPLOAD_HOST=192.168.8.209
 GITHUB_REPOS=adafruit/Adafruit_BNO055 \
 adafruit/Adafruit-GFX-Library \
 adafruit/Adafruit_Neopixel \

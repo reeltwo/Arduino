@@ -9,7 +9,6 @@ MARCDUINO_ACTION(PeriscopeDown, *PS01, ({
 
 MARCDUINO_ACTION(PeriscopeUp, *PS02, ({
     // Periscope Up
-    // play whist- sounds
     CommandEvent::process("PSUP");
 }))
 
