@@ -10,6 +10,11 @@ ARDUINO_FQBN:=pro:cpu=16MHzatmega328
 UPLOAD_DEVICE:=atmega328p
 BAUDRATE:=57600
 endif
+ifeq ("$(TARGET)", "Uno")
+ARDUINO_FQBN:=uno
+UPLOAD_DEVICE:=atmega328p
+BAUDRATE:=115200
+endif
 HOSTPROPS := $(shell find * -depth -maxdepth 0 -name $(HOSTNAME).mk -type f)
 ARDUINO_FQBN := $(if $(ARDUINO_FQBN),$(ARDUINO_FQBN),mega:cpu=atmega2560)
 UPLOAD_DEVICE := $(if $(UPLOAD_DEVICE),$(UPLOAD_DEVICE),atmega2560)
