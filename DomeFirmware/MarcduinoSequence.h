@@ -132,7 +132,7 @@ MARCDUINO_ANIMATION(LeiaMessage, :SE08)
     DO_START()
     DO_MARCDUINO(F("$73"))
     DO_COMMAND_AND_WAIT(F(
-        "LE300045\n"
+        "LE30045\n"
         "HPS1|45\n"
         "CB10000\n"
         "DP10000\n"), 45000)
@@ -165,7 +165,7 @@ MARCDUINO_ANIMATION(DiscoSequence, :SE09)
 
 ////////////////
 
-MARCDUINO_ACTION(ScreamNoPanelSequence, :SE15, ({
+MARCDUINO_ACTION(ScreamNoPanelSequence, :SE50, ({
     CommandEvent::process("LE10003");
     Marcduino::send(F("$S"));
 }))
@@ -295,3 +295,22 @@ MARCDUINO_ANIMATION(GirlOnFireSequence, $821)
 }
 
 ////////////////
+
+MARCDUINO_ANIMATION(YodaClearMind, $720)
+{
+    DO_START()
+    DO_SEQUENCE(SeqPanelAllOpen, PANEL_GROUP_6)
+    DO_COMMAND(F(
+        // Yoda LED sequence
+        "HPO006|15\n"))
+    // Wait 15 seconds
+    DO_WAIT_SEC(15)
+    DO_SEQUENCE(SeqPanelAllClose, PANEL_GROUP_6)
+    DO_RESET({
+        resetSequence();
+    })
+    DO_END()
+}
+
+////////////////
+
