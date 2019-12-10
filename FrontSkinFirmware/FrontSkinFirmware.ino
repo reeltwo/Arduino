@@ -20,6 +20,7 @@
 #include "ServoDispatchPCA9685.h"
 #include "ServoSequencer.h"
 
+#include "core/Marcduino.h"
 #include "core/JawaCommander.h"
 
 #define OUTPUT_ENABLED_PIN  3
@@ -27,10 +28,13 @@
 #define CBI_CLOCK_PIN       9
 #define CBI_LOAD_PIN        10
 
-#define GROUP_DOORS      0x0003
-#define GROUP_SMALLDOORS 0x0001
-#define GROUP_BIGDOORS   0x0002
-#define GROUP_ARMS       0x0004
+#define GROUP_DOORS      0x000F
+#define GROUP_DATAPANEL  0x0001
+#define GROUP_CHARGEBAY  0x0002
+#define GROUP_LEFTDOOR   0x0004
+#define GROUP_RIGHTDOOR  0x0008
+#define GROUP_UPPERARM   0x0010
+#define GROUP_LOWERARM   0x0020
 
 #define DOOR_DATAPANEL  0
 #define DOOR_LEFT       1
@@ -44,17 +48,19 @@
 
 const ServoSettings servoSettings[] PROGMEM = {
     // Servo #1 used for volt meter for now
-    { 2,  1000, 1790, GROUP_SMALLDOORS },  /* 0: data panel */
-    { 3,  1000, 1790, GROUP_BIGDOORS },    /* 1: left body door */
-    { 4,  1000, 1790, GROUP_ARMS },        /* 2: upper utility arm */
-    { 12, 1000, 1790, GROUP_SMALLDOORS },  /* 3: charge bay door */
+    { 2,  950,  1250, GROUP_DATAPANEL },   /* 0: data panel */
+    { 3,  870,  1690,  GROUP_LEFTDOOR },   /* 1: left body door */
+    { 4,  1000, 1790, GROUP_UPPERARM },    /* 2: upper utility arm */
+    { 12, 1000, 1790, GROUP_CHARGEBAY },   /* 3: charge bay door */
     { 13, 1000, 1790, 0 },                 /* 4: cpu arm extend */
     { 14, 1000, 1790, 0 },                 /* 5: cpu arm lift */
-    { 15, 1000, 1790, GROUP_ARMS },        /* 6: lower utlity arm */
-    { 16, 1000, 1790, GROUP_BIGDOORS },    /* 7: right body door */
+    { 15, 1000, 1790, GROUP_LOWERARM },    /* 6: lower utlity arm */
+    { 16, 1000, 1690, GROUP_RIGHTDOOR },   /* 7: right body door */
 };
 ServoDispatchPCA9685<SizeOfArray(servoSettings)> servoDispatch(servoSettings);
 ServoSequencer servoSequencer(servoDispatch);
+
+AnimationPlayer player(servoSequencer);
 JawaCommander<> jawaCommander;
 
 LedControlMAX7221<3> ledChain1(CBI_DATAIN_PIN, CBI_CLOCK_PIN, CBI_LOAD_PIN);
@@ -103,13 +109,13 @@ void closeRightBodyDoor()
 
 void openDataPanelDoor()
 {
-    servoDispatch.moveTo(DOOR_DATAPANEL, 150, 100, 1790);
+    servoDispatch.moveTo(DOOR_DATAPANEL, 150, 100, 1300);
     dataPanel.setSequence(DataPanel::kNormal);
 }
 
 void closeDataPanelDoor()
 {
-    servoDispatch.moveTo(DOOR_DATAPANEL, 150, 100, 1000);
+    servoDispatch.moveTo(DOOR_DATAPANEL, 150, 100, 950);
     dataPanel.setSequence(DataPanel::kDisabled);
 }
 
@@ -124,6 +130,145 @@ void closeChargeBayDoor()
     servoDispatch.moveTo(DOOR_CHARGEBAY, 150, 100, 1000);
     chargeBayIndicator.setSequence(ChargeBayIndicator::kDisabled);
 }
+
+////////////////
+
+MARCDUINO_ACTION(StopSequence, :SE00, ({
+}))
+
+MARCDUINO_ANIMATION(OpenUtilityArms, :SE10)
+{
+    DO_START()
+    DO_ONCE({
+        openUpperArm();
+        openLowerArm();
+    })
+    DO_END()
+}
+
+MARCDUINO_ANIMATION(CloseUtilityArms, :SE11)
+{
+    DO_START()
+    DO_ONCE({
+        closeUpperArm();
+        closeLowerArm();
+    })
+    DO_END()
+}
+
+MARCDUINO_ANIMATION(OpenChargeBayDoor, :SE12)
+{
+    DO_START()
+    DO_ONCE({
+        openChargeBayDoor();
+    })
+    DO_END()
+}
+
+MARCDUINO_ANIMATION(OpenDataPanelDoor, :SE13)
+{
+    DO_START()
+    DO_ONCE({
+        openDataPanelDoor();
+    })
+    DO_END()
+}
+
+MARCDUINO_ANIMATION(CloseChargeBayDoor, :SE14)
+{
+    DO_START()
+    DO_ONCE({
+        closeChargeBayDoor();
+    })
+    DO_END()
+}
+
+MARCDUINO_ANIMATION(CloseDataPanelDoor, :SE15)
+{
+    DO_START()
+    DO_ONCE({
+        closeDataPanelDoor();
+    })
+    DO_END()
+}
+
+MARCDUINO_ANIMATION(OpenCPUARM, :SE16)
+{
+    DO_START()
+    DO_ONCE_AND_WAIT({
+        openRightBodyDoor();
+    }, 1000)
+    DO_ONCE_AND_WAIT({
+        servoDispatch.moveTo(CPUARM_EXTEND, 150, 100, 1000);
+        servoDispatch.moveTo(CPUARM_LIFT, 150, 2000, 1000);
+    }, 3000)
+    DO_ONCE({
+        servoDispatch.moveTo(CPUARM_EXTEND, 150, 1000, 1750);
+    })
+    DO_END()
+}
+
+MARCDUINO_ANIMATION(CloseCPUARM, :SE17)
+{
+    DO_START()
+    DO_ONCE_AND_WAIT({
+        servoDispatch.moveTo(CPUARM_EXTEND, 150, 1000, 1000);
+    }, 1000)
+    DO_ONCE_AND_WAIT({
+        servoDispatch.moveTo(CPUARM_LIFT, 150, 2000, 1750);
+    }, 2000)
+    DO_ONCE_AND_WAIT({
+        servoDispatch.moveTo(CPUARM_EXTEND, 150, 1000, 1000);
+    }, 1000)
+    DO_ONCE({
+        closeRightBodyDoor();
+    })
+    DO_END()
+}
+
+// #define GROUP_DATAPANEL  0x0001
+// #define GROUP_CHARGEBAY  0x0002
+// #define GROUP_LEFTDOOR   0x0004
+// #define GROUP_RIGHTDOOR  0x0008
+// #define GROUP_UPPERARM   0x0010
+// #define GROUP_LOWERARM   0x0020
+
+static const ServoSequence SeqBodyPanelAllOpen PROGMEM =
+{
+    { 20,   B00010000, B00000000, B00000000, B00000000 },
+};
+
+static const ServoSequence SeqBodyPanelAllClose PROGMEM =
+{
+    { 20,   B11101111, B00000000, B00000000, B00000000 },
+};
+
+static const ServoSequence SeqBodyPanelAllFlutter PROGMEM =
+{
+    SEQUENCE_RANGE_LIMIT(200, 200)
+    { 10,   B00010000, B00000000, B00000000, B00000000 },
+    { 10,   B11101111, B00000000, B00000000, B00000000 },
+    { 10,   B00010000, B00000000, B00000000, B00000000 },
+    { 10,   B11101111, B00000000, B00000000, B00000000 },
+    { 10,   B00010000, B00000000, B00000000, B00000000 },
+    { 10,   B11101111, B00000000, B00000000, B00000000 },
+    { 10,   B00010000, B00000000, B00000000, B00000000 },
+    { 10,   B11101111, B00000000, B00000000, B00000000 },
+    { 10,   B00010000, B00000000, B00000000, B00000000 },
+    { 10,   B11101111, B00000000, B00000000, B00000000 },
+};
+
+MARCDUINO_ACTION(FlutterAllPanels, :OF00, ({
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqBodyPanelAllFlutter, GROUP_DOORS, 10, 50);
+}))
+
+MARCDUINO_ACTION(OpenAllPanels, :OP00, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqBodyPanelAllOpen, GROUP_DOORS);
+}))
+
+MARCDUINO_ACTION(CloseAllPanels, :CL00, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqBodyPanelAllClose, GROUP_DOORS);
+}))
 
 void openCPUARM()
 {
@@ -152,6 +297,19 @@ void closeCPUARM()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+
+SMQMESSAGE(MARC, {
+    static char marcBuffer[65];
+    const char* cmd = msg.get_string(MSGID("cmd"), marcBuffer, sizeof(marcBuffer));
+    Marcduino::processCommand(player, cmd);
+})
+
+SMQMESSAGE(JAWA, {
+    char* cmdBuffer = jawaCommander.getBuffer();
+    size_t cmdBufferSize = jawaCommander.getBufferSize();
+    const char* cmd = msg.get_string(MSGID("cmd"), cmdBuffer, cmdBufferSize);
+    jawaCommander.process(cmd);
+})
 
 SMQMESSAGE(ServoDispatch, {
     byte num = msg.get_integer(MSGID("num"));
@@ -190,29 +348,14 @@ void setup()
     dataPanel.setSequence(DataPanel::kDisabled);
     chargeBayIndicator.setSequence(ChargeBayIndicator::kDisabled);
 
-    servoDispatch.moveTo(CPUARM_EXTEND, 150, 100, 1000);
+    // closeCPUARM();
 
-    // // Open all servos in 4 seconds
-    // DelayCall::schedule([] { openLeftBodyDoor(); openRightBodyDoor(); }, 4000);
-    // DelayCall::schedule([] { openChargeBayDoor(); openDataPanelDoor(); }, 4000);
+    DelayCall::schedule([] { Marcduino::send(F("$84")); }, 2000);
     DelayCall::schedule([] { openLowerArm(); }, 4000);
-    // DelayCall::schedule([] { openCPUARM(); openLeftBodyDoor(); openChargeBayDoor(); openDataPanelDoor(); }, 4000);
-    // // Close all servos in 8 seconds
-    // DelayCall::schedule([] { closeLeftBodyDoor(); closeRightBodyDoor(); }, 8000);
-    // DelayCall::schedule([] { closeChargeBayDoor(); closeDataPanelDoor(); }, 8000);
     DelayCall::schedule([] { closeLowerArm(); }, 8000);
-    // DelayCall::schedule([] { closeCPUARM(); closeLeftBodyDoor(); closeChargeBayDoor(); closeDataPanelDoor(); }, 12000);
 }
 
-// uint32_t lastTime;
 void loop()
 {
     AnimatedEvent::process();
-    // if (lastTime + 100 < millis())
-    // {
-    //     int val = analogRead(0);
-    //     DEBUG_PRINT("Vibration : ");
-    //     DEBUG_PRINTLN(val);
-    //     lastTime = millis();
-    // }
 }
