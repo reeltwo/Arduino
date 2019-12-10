@@ -23,7 +23,7 @@
 // D7  - OUTPUT_ENABLED_PIN
 // D8  - SMOKE_PIN
 // D9  - Rear Neo PSI
-
+// D10 - Yoda Holo
 
 // D53 - SDCS (SC) (Gray Wire)
 // D47 - OCS (OC) (Orange Wire)
@@ -61,6 +61,7 @@
 #define OUTPUT_ENABLED_PIN  7
 #define SMOKE_PIN           8
 #define REAR_NEOPSI_PIN     9
+#define HP_YODA_LED_PIN     10
 
 #define SMALL_PANEL         0x0001
 #define MEDIUM_PANEL        0x0002
@@ -94,7 +95,7 @@ const ServoSettings servoSettings[] PROGMEM = {
     { 2,  1500, 2300, PANEL_GROUP_3|SMALL_PANEL },  /* 1: door 3 */
     { 4,   900, 1650, PANEL_GROUP_2|SMALL_PANEL },  /* 2: door 2 */
     { 6,  1200, 1900, PANEL_GROUP_1|SMALL_PANEL },  /* 3: door 1 */
-    { 17, 1300, 1900, PANEL_GROUP_5|MEDIUM_PANEL }, /* 4: door 5 */
+    { 19, 1300, 1900, PANEL_GROUP_5|MEDIUM_PANEL }, /* 4: door 5 */
     { 9,  1200, 2000, PANEL_GROUP_6|BIG_PANEL },    /* 5: door 9 */
     { 8,  1275, 1975, MINI_PANEL },                 /* 6: mini door 2 */
     { 7,  1550, 1900, MINI_PANEL },                 /* 7: mini front psi door */
@@ -103,13 +104,16 @@ const ServoSettings servoSettings[] PROGMEM = {
     { 11, 1200, 2000, PANEL_GROUP_8|PIE_PANEL },    /* 10: pie panel 3 */
     { 12,  750, 1450, PANEL_GROUP_7|PIE_PANEL },    /* 11: pie panel 4 */
     { 5,  1250, 1850, TOP_PIE_PANEL },              /* 12: dome top panel */
-    { 13,  800, 1600, HOLO_HSERVO },                /* 13: horizontal front holo */
-    { 14,  800, 1800, HOLO_VSERVO },                /* 14: vertical front holo */
-    { 15,  800, 1600, HOLO_HSERVO },                /* 15: horizontal top holo */
-    { 16,  800, 1325, HOLO_VSERVO },                /* 16: vertical top holo */
-    { 25,  900, 1000, HOLO_VSERVO },                /* 17: vertical rear holo */
-    { 26, 1300, 1600, HOLO_HSERVO },                /* 18: horizontal rear holo */
+    { 23,  800, 1600, HOLO_HSERVO },                /* 13: horizontal front holo */
+    { 22,  800, 1800, HOLO_VSERVO },                /* 14: vertical front holo */
+
+    { 21,  800, 1600, HOLO_HSERVO },                /* 15: horizontal top holo */
+    { 20,  800, 1325, HOLO_VSERVO },                /* 16: vertical top holo */
+
+    { 18,  900, 1000, HOLO_VSERVO },                /* 17: vertical rear holo */
+    { 17, 1300, 1600, HOLO_HSERVO },                /* 18: horizontal rear holo */
 };
+
 const uint8_t servoFeedbackPins[] PROGMEM = {
     A8,     // Rear Holo Pos Vertical/Horizontal?
     A9,     // Rear Holo Pos Vertical/Horizontal?
@@ -120,13 +124,14 @@ const uint8_t servoFeedbackPins[] PROGMEM = {
     A15     // Front Holo Vertical Pos
 };
 
-ServoDispatchFuzzyNoodlePCA9685<SizeOfArray(servoSettings)> servoDispatch(servoSettings);
+ServoDispatchPCA9685<SizeOfArray(servoSettings)> servoDispatch(servoSettings);
 ServoSequencer servoSequencer(servoDispatch);
 ServoFeedback<SizeOfArray(servoFeedbackPins)> servoFeedback(servoFeedbackPins);
 HoloDisplay frontHolo(HoloLights::kRGBW, HoloLights::kFrontHolo);
 HoloLights rearHolo(HP_REAR_LED_PIN, HoloLights::kRGBW, HoloLights::kRearHolo);
 HoloLights topHolo(HP_TOP_LED_PIN, HoloLights::kRGBW, HoloLights::kTopHolo, 12);
 HoloLights radarEye(RADAR_EYE_LED_PIN, HoloLights::kRGBW, HoloLights::kRadarEye, 24);
+HoloLights yoda(HP_YODA_LED_PIN, HoloLights::kRGBW, HoloLights::kOtherHolo);
 MicrophoneAmplitude mic;
 LogicEngineDeathStarFLDInverted<> FLD(LogicEngineFLDDefault);
 LogicEngineDeathStarRLDInverted<> RLD(LogicEngineRLDDefault);
