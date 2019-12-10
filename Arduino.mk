@@ -101,8 +101,7 @@ upload:
 ifneq ("$(SSH_UPLOAD_HOST)", "")
 	@echo "\nUploading to $(SSH_UPLOAD_HOST)"
 	scp .build/$(SKETCH).ino.hex $(SSH_UPLOAD_USER)@$(SSH_UPLOAD_HOST):roms
-
-	ssh $(SSH_UPLOAD_USER)@$(SSH_UPLOAD_HOST) roms/flash.sh $(SKETCH)
+	ssh $(SSH_UPLOAD_USER)@$(SSH_UPLOAD_HOST) roms/flash.sh $(SKETCH) $(shell strings .build/$(SKETCH).ino.elf | grep -m 1 ReelTwoSMQ.h 2> /dev/null)
 	@echo
 else
 	@echo "\nUploading on $(HOSTNAME)"
