@@ -1,5 +1,6 @@
 TARGET=Mega2560
 SSH_UPLOAD_HOST=nano1
+SSH_UPLOAD_USER=mimir
 GITHUB_REPOS=adafruit/Adafruit_BNO055 \
 adafruit/Adafruit-GFX-Library \
 adafruit/Adafruit_Neopixel \
