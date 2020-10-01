@@ -60,7 +60,9 @@ AVRDUDE_OPTS += -q
 endif
 BUILDER_CMD=$(ARDUINO_BUILDER) -hardware $(ARDUINO_HARDWARE) -tools $(ARDUINO_TOOLS) -tools $(BUILDER_TOOLS) -libraries $(SYSTEM_LIBRARIES) -libraries $(PROJECT_LIBRARIES) $(GITHUB_LIBRARIES) -fqbn arduino:avr:$(ARDUINO_FQBN) $(ARDUINO_OPTS) 
 
+ifndef SSH_UPLOAD_USER
 SSH_UPLOAD_USER := pi
+endif
 
 # Check to see if we have a host specific override file for PORT variable
 ifneq ("$(HOSTPROPS)", "")

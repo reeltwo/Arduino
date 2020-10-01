@@ -12,7 +12,7 @@
 // #define USE_VERBOSE_SERVO_DEBUG
 // #define USE_SMQDEBUG
 #include "ReelTwoSMQ.h"    /* include first to enable SMQ support */
-#include "ReelTwo.h"    /* include first to enable SMQ support */
+#include "ReelTwo.h"    /* include first to disable SMQ support */
 #include "core/Animation.h"
 #include "core/DelayCall.h"
 #include "body/DataPanel.h"
@@ -36,26 +36,30 @@
 #define GROUP_UPPERARM   0x0010
 #define GROUP_LOWERARM   0x0020
 
-#define DOOR_DATAPANEL  0
-#define DOOR_LEFT       1
-#define UPPER_ARM       2
+#define DOOR_LEFT       0
+#define DOOR_DATAPANEL  1
+#define XCHGARM_ROTATE  2
+#define UPPER_ARM       3
+#define XCHGARM_LIFT    4
 
-#define DOOR_CHARGEBAY  3
-#define CPUARM_EXTEND   4
-#define CPUARM_LIFT     5
-#define LOWER_ARM       6
-#define DOOR_RIGHT      7
+#define DOOR_CHARGEBAY  5
+#define CPUARM_EXTEND   6
+#define CPUARM_LIFT     7
+#define LOWER_ARM       8
+#define DOOR_RIGHT      9
 
 const ServoSettings servoSettings[] PROGMEM = {
     // Servo #1 used for volt meter for now
-    { 2,  950,  1250, GROUP_DATAPANEL },   /* 0: data panel */
-    { 3,  870,  1690,  GROUP_LEFTDOOR },   /* 1: left body door */
-    { 4,  1000, 1790, GROUP_UPPERARM },    /* 2: upper utility arm */
-    { 12, 1000, 1790, GROUP_CHARGEBAY },   /* 3: charge bay door */
-    { 13, 1000, 1790, 0 },                 /* 4: cpu arm extend */
-    { 14, 1000, 1790, 0 },                 /* 5: cpu arm lift */
-    { 15, 1000, 1790, GROUP_LOWERARM },    /* 6: lower utlity arm */
-    { 16, 1000, 1690, GROUP_RIGHTDOOR },   /* 7: right body door */
+    { 1,  870,  1690, GROUP_LEFTDOOR },    /* 0: left body door */
+    { 2,  950,  1250, GROUP_DATAPANEL },   /* 1: data panel */
+    { 3,  1000, 1500, 0 },                 /* 2: xchg arm rotate */
+    { 4,  1000, 1920, GROUP_UPPERARM },    /* 3: upper utility arm */
+    { 5,   900, 1425, 0 },                 /* 4: xchg arm lift */
+    { 12, 1000, 1790, GROUP_CHARGEBAY },   /* 5: charge bay door */
+    { 13, 1000, 1790, 0 },                 /* 6: cpu arm extend */
+    { 14, 1000, 1790, 0 },                 /* 7: cpu arm lift */
+    { 15, 1000, 1890, GROUP_LOWERARM },    /* 8: lower utlity arm */
+    { 16, 1000, 1790, GROUP_RIGHTDOOR },   /* 9: right body door */
 };
 ServoDispatchPCA9685<SizeOfArray(servoSettings)> servoDispatch(servoSettings);
 ServoSequencer servoSequencer(servoDispatch);
@@ -69,12 +73,12 @@ DataPanel dataPanel(ledChain1);
 
 void openUpperArm()
 {
-    servoDispatch.moveTo(UPPER_ARM, 150, 100, 1000);
+    servoDispatch.moveTo(UPPER_ARM, 150, 300, 1000);
 }
 
 void closeUpperArm()
 {
-    servoDispatch.moveTo(UPPER_ARM, 150, 100, 1790);
+    servoDispatch.moveTo(UPPER_ARM, 150, 300, 1920);
 }
 
 void openLowerArm()
@@ -84,7 +88,7 @@ void openLowerArm()
 
 void closeLowerArm()
 {
-    servoDispatch.moveTo(LOWER_ARM, 150, 300, 1790);
+    servoDispatch.moveTo(LOWER_ARM, 150, 300, 1890);
 }
 
 void openLeftBodyDoor()
@@ -222,6 +226,39 @@ MARCDUINO_ANIMATION(CloseCPUARM, :SE17)
     }, 1000)
     DO_ONCE({
         closeRightBodyDoor();
+    })
+    DO_END()
+}
+
+MARCDUINO_ANIMATION(OpenXCHGARM, :SE18)
+{
+    DO_START()
+    DO_ONCE_AND_WAIT({
+        openLeftBodyDoor();
+    }, 1000)
+    DO_ONCE_AND_WAIT({
+        servoDispatch.moveTo(XCHGARM_LIFT, 150, 2000, 900);
+    }, 3000)
+    DO_ONCE({
+        servoDispatch.moveTo(XCHGARM_ROTATE, 150, 1000, 1500);
+    })
+    DO_END()
+}
+
+MARCDUINO_ANIMATION(CloseXCHGARM, :SE19)
+{
+    DO_START()
+    DO_ONCE_AND_WAIT({
+        servoDispatch.moveTo(XCHGARM_ROTATE, 150, 1000, 1000);
+    }, 1000)
+    DO_ONCE_AND_WAIT({
+        servoDispatch.moveTo(XCHGARM_ROTATE, 150, 1000, 1500);
+    }, 1000)
+    DO_ONCE_AND_WAIT({
+        servoDispatch.moveTo(XCHGARM_LIFT, 150, 2000, 1750);
+    }, 2000)
+    DO_ONCE({
+        closeLeftBodyDoor();
     })
     DO_END()
 }

@@ -90,7 +90,7 @@ MARCDUINO_ACTION(OpenBottomPanels, :OP12, ({
 }))
 
 
-MARCDUINO_ACTION(ClosePanelGroup1, :CLP01, ({
+MARCDUINO_ACTION(ClosePanelGroup1, :CL01, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_1);
 }))
 
