@@ -1,4 +1,4 @@
-//#define USE_DEBUG
+// #define USE_DEBUG
 //#define USE_SMQDEBUG
 #include "ReelTwoSMQ.h"
 #include "ReelTwo.h"
@@ -6,6 +6,7 @@
 #include "core/DelayCall.h"
 #include "body/Stance.h"
 #include "core/StealthController.h"
+#include "core/HeartBeat.h"
 #include "i2c/I2CReceiver.h"
 #include "Orientation.h"
 #include "ServoDispatchPCA9685.h"
@@ -13,6 +14,8 @@
 
 #include "core/JawaCommander.h"
 #include "core/Marcduino.h"
+
+#include <Adafruit_MCP4725.h>
 
 #define PIN_OUTPUT_ENABLE       5
 #define PIN_LEG_TILT_UP         6
@@ -41,6 +44,7 @@ Stance stance(PIN_LEG_TILT_UP, PIN_LEG_TILT_DOWN, PIN_CENTER_LEG_UP, PIN_CENTER_
 
 AnimationPlayer player(servoSequencer);
 JawaCommander<> jawaCommander;
+Adafruit_MCP4725 dac; // revisit dont use
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -57,6 +61,28 @@ SMQMESSAGE(JAWA, {
     jawaCommander.process(cmd);
 })
 
+void setDomePosition(int domePos)
+{
+    // Normalize request to [0, 360]
+    int dir = fmod(domePos, 360);
+    if (dir < 0)
+        dir += 360;
+    int vcc = map(dir, 0, 359, 120, 3754);
+    dac.setVoltage(vcc, false);
+}
+
+SMQMESSAGE(Orientation, {
+    uint8_t id = msg.get_uint8(MSGID("id"));
+    float yaw = msg.get_float(MSGID("yaw"));
+    float roll = msg.get_float(MSGID("roll"));
+    float pitch = msg.get_float(MSGID("pitch"));
+    setDomePosition(yaw - bodyOrientation.getYaw());
+})
+
+SMQMESSAGE(DOME, {
+    setDomePosition(msg.get_int16(MSGID("dir")));
+})
+
 ////////////////////////////////////////////////////////////////////////////////
 
 I2CReceiver i2c(99);
@@ -69,7 +95,9 @@ void setup()
 
     stance.setOrientationSensors(bodyOrientation, tiltOrientation);
     servoDispatch.setOutputEnablePin(PIN_OUTPUT_ENABLE);
-//    Wire.setClock(400000); //Set i2c frequency to 400 kHz.
+    Wire.begin();
+    //Wire.setClock(400000); //Set i2c frequency to 400 kHz.
+    dac.begin(0x62);
 
     randomSeed(analogRead(3));
 
@@ -88,12 +116,6 @@ MARCDUINO_ACTION(DirectCommand, *RT, ({
 
 void loop()
 {
-    // float bodyYaw;
-    // float bodyRoll;
-    // float bodyPitch;
-    // float tiltYaw;
-    // float tiltRoll;
-    // float tiltPitch;
     AnimatedEvent::process();
 
     if (stealthController.getDomeMotorMoving() || stealthController.getLegMotorsMoving())
@@ -127,35 +149,5 @@ void loop()
         Marcduino::send(F("$DRUN"));
         domeMotorStartMillis = 0;
     }
-
-    // if (bodyOrientation.getYawChanged(bodyYaw))
-    // {
-    //     DEBUG_PRINT("BODY YAW    : ");
-    //     DEBUG_PRINTLN(bodyYaw);
-    // }
-    // if (bodyOrientation.getPitchChanged(bodyPitch))
-    // {
-    //     DEBUG_PRINT("BODY PITCH  : ");
-    //     DEBUG_PRINTLN(bodyPitch);
-    // }
-    // if (bodyOrientation.getRollChanged(bodyRoll))
-    // {
-    //     DEBUG_PRINT("BODY ROLL   : ");
-    //     DEBUG_PRINTLN(bodyRoll);
-    // }
-    // if (tiltOrientation.getYawChanged(tiltYaw))
-    // {
-    //     DEBUG_PRINT("TILT YAW    : ");
-    //     DEBUG_PRINTLN(tiltYaw);
-    // }
-    // if (tiltOrientation.getPitchChanged(tiltPitch))
-    // {
-    //     DEBUG_PRINT("TILT PITCH  : ");
-    //     DEBUG_PRINTLN(tiltPitch);
-    // }
-    // if (tiltOrientation.getRollChanged(tiltRoll))
-    // {
-    //     DEBUG_PRINT("TILT ROLL   : ");
-    //     DEBUG_PRINTLN(tiltRoll);
-    // }
+    sendHeartBeat("BO",1000);
 }

@@ -1,4 +1,4 @@
-// #define USE_DEBUG
+//#define USE_DEBUG
 // #define USE_SERVO_DEBUG
 
 // PINOUT
@@ -51,6 +51,7 @@
 #include "core/DelayCall.h"
 #include "core/Marcduino.h"
 #include "core/JawaCommander.h"
+#include "core/HeartBeat.h"
 
 #define HP_FRONT_LED_PIN    45
 #define HP_REAR_LED_PIN     2
@@ -91,27 +92,27 @@
 #define PANEL_GROUP_10     (1L<<23)
 
 const ServoSettings servoSettings[] PROGMEM = {
-    { 1,  1000, 1650, PANEL_GROUP_4|SMALL_PANEL },  /* 0: door 4 */
-    { 2,  1500, 2300, PANEL_GROUP_3|SMALL_PANEL },  /* 1: door 3 */
-    { 4,   900, 1650, PANEL_GROUP_2|SMALL_PANEL },  /* 2: door 2 */
-    { 6,  1200, 1900, PANEL_GROUP_1|SMALL_PANEL },  /* 3: door 1 */
-    { 19, 1300, 1900, PANEL_GROUP_5|MEDIUM_PANEL }, /* 4: door 5 */
-    { 9,  1200, 2000, PANEL_GROUP_6|BIG_PANEL },    /* 5: door 9 */
-    { 8,  1275, 1975, MINI_PANEL },                 /* 6: mini door 2 */
-    { 7,  1550, 1900, MINI_PANEL },                 /* 7: mini front psi door */
-    { 3,  1250, 1900, PANEL_GROUP_10|PIE_PANEL },   /* 8: pie panel 1 */
-    { 10, 1075, 1700, PANEL_GROUP_9|PIE_PANEL },    /* 9: pie panel 2 */
-    { 11, 1200, 2000, PANEL_GROUP_8|PIE_PANEL },    /* 10: pie panel 3 */
-    { 12,  750, 1450, PANEL_GROUP_7|PIE_PANEL },    /* 11: pie panel 4 */
-    { 5,  1250, 1850, TOP_PIE_PANEL },              /* 12: dome top panel */
+    { 1,  1650, 1000, PANEL_GROUP_4|SMALL_PANEL },  /* 0: door 4 */
+    { 2,  2300, 1500, PANEL_GROUP_3|SMALL_PANEL },  /* 1: door 3 */
+    { 4,  1650, 900,  PANEL_GROUP_2|SMALL_PANEL },  /* 2: door 2 */
+    { 6,  1950, 1200, PANEL_GROUP_1|SMALL_PANEL },  /* 3: door 1 */
+    { 19, 1900, 1300, PANEL_GROUP_5|MEDIUM_PANEL }, /* 4: door 5 */
+    { 9,  2000, 1200, PANEL_GROUP_6|BIG_PANEL },    /* 5: door 9 */
+    { 8,  1975, 1275, MINI_PANEL },                 /* 6: mini door 2 */
+    { 7,  1900, 1550, MINI_PANEL },                 /* 7: mini front psi door */
+    { 3,  1900, 1250, PANEL_GROUP_10|PIE_PANEL },   /* 8: pie panel 1 */
+    { 10, 1700, 1075, PANEL_GROUP_9|PIE_PANEL },    /* 9: pie panel 2 */
+    { 11, 2000, 1200, PANEL_GROUP_8|PIE_PANEL },    /* 10: pie panel 3 */
+    { 12, 1450,  750, PANEL_GROUP_7|PIE_PANEL },    /* 11: pie panel 4 */
+    { 5,  1850, 1250, TOP_PIE_PANEL },              /* 12: dome top panel */
     { 23,  800, 1600, HOLO_HSERVO },                /* 13: horizontal front holo */
     { 22,  800, 1800, HOLO_VSERVO },                /* 14: vertical front holo */
 
     { 21,  800, 1600, HOLO_HSERVO },                /* 15: horizontal top holo */
     { 20,  800, 1325, HOLO_VSERVO },                /* 16: vertical top holo */
 
-    { 18,  900, 1000, HOLO_VSERVO },                /* 17: vertical rear holo */
-    { 17, 1300, 1600, HOLO_HSERVO },                /* 18: horizontal rear holo */
+    { 18,  800, 1600, HOLO_VSERVO },                /* 17: vertical rear holo */
+    { 17,  800, 1800, HOLO_HSERVO },                /* 18: horizontal rear holo */
 };
 
 const uint8_t servoFeedbackPins[] PROGMEM = {
@@ -159,6 +160,29 @@ SMQMESSAGE(JAWA, {
     jawaCommander.process(cmd);
 })
 
+SMQMESSAGE(DomePanelGroupEasing, {
+    uint32_t groupMask = msg.get_integer(MSGID("mask"));
+    uint32_t easing = msg.get_integer(MSGID("easing"));
+    if (groupMask != 0)
+    {
+        servoDispatch.setServosEasingMethod(groupMask, Easing::getEasingMethod(easing));
+    }
+})
+
+SMQMESSAGE(DomePanelGroupMove, {
+    uint32_t groupMask = msg.get_integer(MSGID("mask"));
+    uint32_t startDelay = msg.get_integer(MSGID("startDelay"));
+    uint32_t moveTimeMin = msg.get_integer(MSGID("moveTimeMin"));
+    uint32_t moveTimeMax = msg.get_integer(MSGID("moveTimeMax"));
+    uint32_t easing = msg.get_integer(MSGID("easing"));
+    float pos = msg.get_float(MSGID("pos"));
+    if (groupMask != 0)
+    {
+        servoDispatch.setServosEasingMethod(groupMask, Easing::getEasingMethod(easing));
+        servoDispatch.moveServosTo(groupMask, startDelay, moveTimeMin, moveTimeMax, pos);
+    }
+})
+
 SMQMESSAGE(ServoDispatch, {
     byte num = msg.get_integer(MSGID("num"));
     if (num < servoDispatch.getNumServos())
@@ -177,6 +201,15 @@ SMQMESSAGE(ServoDispatch, {
     }
 })
 
+SMQMESSAGE(FACE, {
+    float x = msg.get_float(MSGID("x"));
+    float y = msg.get_float(MSGID("y"));
+    float joy = msg.get_float(MSGID("joy"));
+    frontHolo.setHoloPosition(x, y);
+    rearHolo.setHoloPosition(x, y);
+    topHolo.setHoloPosition(x, y);
+})
+
 ////////////////////////////////////////////////////////////////////////////////
 
 void setup()
@@ -188,8 +221,9 @@ void setup()
 
     randomSeed(analogRead(3));
 
-    servoDispatch.setOutputEnablePin(OUTPUT_ENABLED_PIN, true);
+    // servoDispatch.setOutputEnablePin(OUTPUT_ENABLED_PIN, true);
     servoDispatch.setClockCalibration((const uint32_t[]) { 27570000, 27190000 });
+    servoDispatch.setServosEasingMethod(HOLO_SERVOS_MASK, Easing::CircularEaseIn);
 
     frontHolo.assignServos(&servoDispatch, 13, 14);
     topHolo.assignServos(&servoDispatch, 15, 16);
@@ -200,7 +234,7 @@ void setup()
 
     SetupEvent::ready();
 
-    DelayCall::schedule([] { Marcduino::send(F("$73")); }, 1000);
+//    DelayCall::schedule([] { Marcduino::send(F("$73")); }, 1000);
 
     frontHolo.play("LEIA.BD2");
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
@@ -255,11 +289,53 @@ MARCDUINO_ACTION(DirectCommand, *RT, ({
 
 void loop()
 {
-    static float heading = 0;
-    heading += 0.1;
-    if (orientation.getYawChanged(heading))
-    {
-//        servoDispatch.moveTo(12, 150, 1250 + int((1850.0 - 1250.0) * (heading / 360.0)));
-    }
     AnimatedEvent::process();
+
+#ifdef USE_DEBUG
+    if (DEBUG_SERIAL.available())
+    {
+        int ch = DEBUG_SERIAL.read();
+        if (ch == 'o')
+        {
+            servoDispatch.setServosEasingMethod(ALL_DOME_PANELS_MASK, Easing::CircularEaseIn);
+            SEQUENCE_PLAY_ONCE_SPEED(servoSequencer, SeqPanelWave, ALL_DOME_PANELS_MASK, 1000);
+        }
+        else if (ch == '1')
+        {
+            frontHolo.moveHP(HoloLights::kLowerLeft, 500);
+        }
+        else if (ch == '2')
+        {
+            frontHolo.moveHP(HoloLights::kDown, 500);
+        }
+        else if (ch == '3')
+        {
+            frontHolo.moveHP(HoloLights::kLowerRight, 500);
+        }
+        else if (ch == '4')
+        {
+            frontHolo.moveHP(HoloLights::kCenter, 500);
+        }
+        else if (ch == 'e')
+        {
+            // servoDispatch.setServosEasingMethod(GROUP_RIGHTDOOR, Easing::CircularEaseIn);
+            SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelMarchingAnts, ALL_DOME_PANELS_MASK, 50, 100);
+        }
+        else if (ch == 'f')
+        {
+            SEQUENCE_PLAY_ONCE_VARSPEED_EASING(servoSequencer, SeqPanelMarchingAnts, ALL_DOME_PANELS_MASK, 500, 1000, Easing::CircularEaseIn, Easing::BounceEaseOut);
+        }
+        else if (ch == 'c')
+        {
+            servoDispatch.setServosEasingMethod(ALL_DOME_PANELS_MASK, Easing::BounceEaseOut);
+            SEQUENCE_PLAY_ONCE_SPEED(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK, 1000);
+        }
+        else
+        {
+            DEBUG_PRINTLN("STOP ALL SERVOS");
+            servoDispatch.stop();
+        }
+    }
+#endif
+    sendHeartBeat("DO",1000);
 }

@@ -5,6 +5,7 @@
 #include "core/DelayCall.h"
 #include "i2c/I2CReceiver.h"
 #include "dome/MagicPanel.h"
+#include "core/HeartBeat.h"
 
 MagicPanel magicPanel;
 I2CReceiver i2cReceiver(I2C_MAGIC_PANEL);
@@ -134,4 +135,5 @@ MARCDUINO_ACTION(MagicReverseQ, *MF13, ({
 void loop()
 {
 	AnimatedEvent::process();
+    sendHeartBeat("MP", 1000);
 }

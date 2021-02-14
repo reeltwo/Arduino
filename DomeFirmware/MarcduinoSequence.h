@@ -15,21 +15,21 @@ MARCDUINO_ACTION(ScreamSequence, :SE01, ({
 
 MARCDUINO_ACTION(WaveSequence, :SE02, ({
     Marcduino::send(F("$213"));
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelWave, DOME_DANCE_PANELS_MASK);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelWave, ALL_DOME_PANELS_MASK);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(SmirkWaveSequence, :SE03, ({
     Marcduino::send(F("$34"));
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelWaveFast, DOME_DANCE_PANELS_MASK);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelWaveFast, ALL_DOME_PANELS_MASK);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(OpenCloseWaveSequence, :SE04, ({
     Marcduino::send(F("$36"));
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelOpenCloseWave, DOME_DANCE_PANELS_MASK);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelOpenCloseWave, ALL_DOME_PANELS_MASK);
 }))
 
 ////////////////
@@ -179,13 +179,13 @@ MARCDUINO_ACTION(ScreamPanelSequence, :SE51, ({
 ////////////////
 
 MARCDUINO_ACTION(WavePanelSequence, :SE52, ({
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelWave, DOME_DANCE_PANELS_MASK);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelWave, ALL_DOME_PANELS_MASK);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(SmirkWavePanelSequence, :SE53, ({
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelWaveFast, DOME_DANCE_PANELS_MASK);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelWaveFast, ALL_DOME_PANELS_MASK);
 }))
 
 ////////////////
