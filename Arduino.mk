@@ -1,19 +1,43 @@
 PWD=$(CURDIR)
 HOSTNAME := $(shell hostname -s)
+PYTHON=python
+ARDUINO_PACKAGES=$(HOME)/.arduino15/packages
+ARDUINO_BUILDER=$(ARDUINO_ROOT)/arduino-builder
+ARDUINO_HARDWARE=$(ARDUINO_ROOT)/hardware
+ARDUINO_TOOLS=$(ARDUINO_ROOT)/hardware/tools
+BUILDER_TOOLS=$(ARDUINO_ROOT)/tools-builder
+AVRDUDE=$(ARDUINO_TOOLS)/avr/bin/avrdude -C $(ARDUINO_TOOLS)/avr/etc/avrdude.conf
+
+ARDUINO_TARGET:=arduino:avr
 ifeq ("$(TARGET)", "Mega2560")
-ARDUINO_FQBN:=mega:cpu=atmega2560
+ARDUINO_FQBN:=$(ARDUINO_TARGET):mega:cpu=atmega2560
 UPLOAD_DEVICE:=atmega2560
 BAUDRATE:=115200
 endif
 ifeq ("$(TARGET)", "ProMini")
-ARDUINO_FQBN:=pro:cpu=16MHzatmega328
+ARDUINO_FQBN:=$(ARDUINO_TARGET):pro:cpu=16MHzatmega328
 UPLOAD_DEVICE:=atmega328p
 BAUDRATE:=57600
 endif
 ifeq ("$(TARGET)", "Uno")
-ARDUINO_FQBN:=uno
+ARDUINO_FQBN:=$(ARDUINO_TARGET):uno
 UPLOAD_DEVICE:=atmega328p
 BAUDRATE:=115200
+endif
+ifeq ("$(TARGET)", "ESP32")
+UPLOAD_DEVICE:=esp32
+BAUDRATE:=921600
+ESP32_CPUFREQ:=240
+ESP32_PSRAM:=disabled
+ESP32_PARTSCHEME:=min_spiffs
+ESP32_DEBUGLEVEL:=none
+ESP32_FLASHSIZE:=4M
+ESP32_FLASHFREQ:=80
+ESp32_FLASHMODE:=qio
+ESP32_OPTIONS:=PSRAM=$(ESP32_PSRAM),PartitionScheme=$(ESP32_PARTSCHEME),CPUFreq=$(ESP32_CPUFREQ),FlashMode=$(ESp32_FLASHMODE),FlashFreq=$(ESP32_FLASHFREQ),FlashSize=$(ESP32_FLASHSIZE),UploadSpeed=$(BAUDRATE),DebugLevel=$(ESP32_DEBUGLEVEL)
+ARDUINO_FQBN:=esp32:esp32:esp32:$(ESP32_OPTIONS)
+ESP32_UPLOAD=$(PYTHON) $(ARDUINO_PACKAGES)/esp32/tools/esptool_py/2.6.1/esptool.py
+ESP32_UPLOAD_OPTIONS=--before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 80m --flash_size detect 0xe000 $(ARDUINO_PACKAGES)/esp32/hardware/esp32/1.0.4/tools/partitions/boot_app0.bin 0x1000 $(ARDUINO_PACKAGES)/esp32/hardware/esp32/1.0.4/tools/sdk/bin/bootloader_qio_80m.bin 0x10000
 endif
 HOSTPROPS := $(shell find * -depth -maxdepth 0 -name $(HOSTNAME).mk -type f)
 ARDUINO_FQBN := $(if $(ARDUINO_FQBN),$(ARDUINO_FQBN),mega:cpu=atmega2560)
@@ -30,11 +54,6 @@ AVRDUDE_OPTS=
 ifeq ($(UPLOAD_DEVICE),atmega2560)
 AVRDUDE_OPTS+=-cwiring
 endif
-ARDUINO_BUILDER=$(ARDUINO_ROOT)/arduino-builder
-ARDUINO_HARDWARE=$(ARDUINO_ROOT)/hardware
-ARDUINO_TOOLS=$(ARDUINO_ROOT)/hardware/tools
-BUILDER_TOOLS=$(ARDUINO_ROOT)/tools-builder
-AVRDUDE=$(ARDUINO_TOOLS)/avr/bin/avrdude -C $(ARDUINO_TOOLS)/avr/etc/avrdude.conf
 AVRSIM=simavr
 SYSTEM_LIBRARIES=$(ARDUINO_ROOT)/libraries
 PROJECT_LIBRARIES=../libraries
@@ -58,7 +77,7 @@ ifeq ("$(SILENT)","1")
 ARDUINO_OPTS += -quiet
 AVRDUDE_OPTS += -q
 endif
-BUILDER_CMD=$(ARDUINO_BUILDER) -hardware $(ARDUINO_HARDWARE) -tools $(ARDUINO_TOOLS) -tools $(BUILDER_TOOLS) -libraries $(SYSTEM_LIBRARIES) -libraries $(PROJECT_LIBRARIES) $(GITHUB_LIBRARIES) -fqbn arduino:avr:$(ARDUINO_FQBN) $(ARDUINO_OPTS) 
+BUILDER_CMD=$(ARDUINO_BUILDER) -hardware $(ARDUINO_HARDWARE) -hardware $(ARDUINO_PACKAGES) -tools $(ARDUINO_TOOLS) -tools $(BUILDER_TOOLS) -tools $(ARDUINO_PACKAGES) -libraries $(SYSTEM_LIBRARIES) -libraries $(PROJECT_LIBRARIES) $(GITHUB_LIBRARIES) -fqbn $(ARDUINO_FQBN) $(ARDUINO_OPTS) 
 
 ifndef SSH_UPLOAD_USER
 SSH_UPLOAD_USER := pi
@@ -72,7 +91,8 @@ endif
 AVRDUDECMD=$(AVRDUDE)
 ifneq ("$(UPLOAD_HOSTS)", "")
 ifeq ($(filter $(HOSTNAME),$(UPLOAD_HOSTS)),)
-AVRDUDECMD = @echo "\nSketch upload disabled. Uploading only allowed on: $(UPLOAD_HOSTS)\n\n   $(AVRDUDE)"
+AVRDUDECMD = @echo "\nSketch upload disabled. Uploading only allowed on: $(UPLOAD_HOSTS)\n\n"
+ESP32_UPLOAD = $(AVRDUDECMD)
 endif
 endif
 
@@ -95,6 +115,7 @@ github_pull:
 
 .build/$(SKETCH).ino.hex: $(SKETCH).ino $(DEPENDS)
 	@mkdir -p .build
+	@echo $(BUILDER_CMD) -build-path $(PWD)/.build $(SKETCH).ino
 	@$(BUILDER_CMD) -build-path $(PWD)/.build $(SKETCH).ino
 
 build: github_clone .build/$(SKETCH).ino.hex
@@ -104,6 +125,11 @@ ifneq ("$(SSH_UPLOAD_HOST)", "")
 	@echo "\nUploading to $(SSH_UPLOAD_HOST)"
 	scp .build/$(SKETCH).ino.hex $(SSH_UPLOAD_USER)@$(SSH_UPLOAD_HOST):roms
 	ssh $(SSH_UPLOAD_USER)@$(SSH_UPLOAD_HOST) roms/flash.sh $(SKETCH) $(shell strings .build/$(SKETCH).ino.elf | grep -m 1 ReelTwoSMQ.h 2> /dev/null)
+	@echo
+else ifneq ("$(ESP32_UPLOAD)", "")
+	@echo "\nUploading on $(HOSTNAME)"
+	@echo $(ESP32_UPLOAD) --chip $(UPLOAD_DEVICE) --port $(PORT) --baud $(BAUDRATE) $(ESP32_UPLOAD_OPTIONS) .build/$(SKETCH).ino.bin 0x8000 .build/$(SKETCH).ino.partitions.bin 
+	@$(ESP32_UPLOAD) --chip $(UPLOAD_DEVICE) --port $(PORT) --baud $(BAUDRATE) $(ESP32_UPLOAD_OPTIONS) .build/$(SKETCH).ino.bin 0x8000 .build/$(SKETCH).ino.partitions.bin 
 	@echo
 else
 	@echo "\nUploading on $(HOSTNAME)"
