@@ -1,5 +1,11 @@
 PWD=$(CURDIR)
 HOSTNAME := $(shell hostname -s)
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+ARDUINO_ROOT=/Applications/Arduino.app/Contents/Java
+else
+ARDUINO_ROOT=/usr/share/arduino
+endif
 PYTHON=python
 ARDUINO_PACKAGES=$(HOME)/.arduino15/packages
 ARDUINO_BUILDER=$(ARDUINO_ROOT)/arduino-builder
@@ -8,52 +14,75 @@ ARDUINO_TOOLS=$(ARDUINO_ROOT)/hardware/tools
 BUILDER_TOOLS=$(ARDUINO_ROOT)/tools-builder
 AVRDUDE=$(ARDUINO_TOOLS)/avr/bin/avrdude -C $(ARDUINO_TOOLS)/avr/etc/avrdude.conf
 
+ifeq ($(TARGET),Mega2560)
+AVRDUDE_PROGRAMMER?=-cwiring
+else
+AVRDUDE_PROGRAMMER?=-carduino
+endif
 ARDUINO_TARGET:=arduino:avr
+ARDUINO_HEX:=ino.hex
 ifeq ("$(TARGET)", "Mega2560")
 ARDUINO_FQBN:=$(ARDUINO_TARGET):mega:cpu=atmega2560
 UPLOAD_DEVICE:=atmega2560
-BAUDRATE:=115200
+BAUDRATE?=115200
 endif
 ifeq ("$(TARGET)", "ProMini")
 ARDUINO_FQBN:=$(ARDUINO_TARGET):pro:cpu=16MHzatmega328
 UPLOAD_DEVICE:=atmega328p
-BAUDRATE:=57600
+BAUDRATE?=57600
+endif
+ifeq ("$(TARGET)", "PololuAStar20")
+ARDUINO_FQBN:=pololu-a-star:avr:a-star328PB:version=20mhz
+UPLOAD_DEVICE:=atmega328pb
+BAUDRATE?=115200
+AVRDUDE:=$(AVRDUDE) -C+$(ARDUINO_PACKAGES)/pololu-a-star/hardware/avr/4.0.2/extra_avrdude.conf
 endif
 ifeq ("$(TARGET)", "Uno")
 ARDUINO_FQBN:=$(ARDUINO_TARGET):uno
 UPLOAD_DEVICE:=atmega328p
-BAUDRATE:=115200
+BAUDRATE?=115200
 endif
 ifeq ("$(TARGET)", "ESP32")
 UPLOAD_DEVICE:=esp32
-BAUDRATE:=921600
-ESP32_CPUFREQ:=240
-ESP32_PSRAM:=disabled
-ESP32_PARTSCHEME:=min_spiffs
-ESP32_DEBUGLEVEL:=none
-ESP32_FLASHSIZE:=4M
-ESP32_FLASHFREQ:=80
-ESp32_FLASHMODE:=qio
-ESP32_OPTIONS:=PSRAM=$(ESP32_PSRAM),PartitionScheme=$(ESP32_PARTSCHEME),CPUFreq=$(ESP32_CPUFREQ),FlashMode=$(ESp32_FLASHMODE),FlashFreq=$(ESP32_FLASHFREQ),FlashSize=$(ESP32_FLASHSIZE),UploadSpeed=$(BAUDRATE),DebugLevel=$(ESP32_DEBUGLEVEL)
+BAUDRATE?=921600
+ESP32_CPUFREQ?=240
+ESP32_PSRAM?=disabled
+ESP32_FILESYSTEM?=spiffs
+ESP32_PARTSCHEME?=min_spiffs
+ESP32_DEBUGLEVEL?=none
+ESP32_FLASHSIZE?=4M
+ESP32_FLASHFREQ?=80
+ESP32_FLASHMODE?=dio
+ESP32_VERSION?=3.0.0
+#ESP32_VERSION:=2.6.1
+ESP32_ARDUINO_VERSION?=1.0.5-rc6
+#ESP32_ARDUINO_VERSION:=1.0.4
+ESP32_HARDWARE:=$(ARDUINO_PACKAGES)/esp32/hardware/esp32/$(ESP32_ARDUINO_VERSION)
+ESP32_OPTIONS:=PSRAM=$(ESP32_PSRAM),PartitionScheme=$(ESP32_PARTSCHEME),CPUFreq=$(ESP32_CPUFREQ),FlashMode=$(ESP32_FLASHMODE),FlashFreq=$(ESP32_FLASHFREQ),FlashSize=$(ESP32_FLASHSIZE),UploadSpeed=$(BAUDRATE),DebugLevel=$(ESP32_DEBUGLEVEL)
 ARDUINO_FQBN:=esp32:esp32:esp32:$(ESP32_OPTIONS)
-ESP32_UPLOAD=$(PYTHON) $(ARDUINO_PACKAGES)/esp32/tools/esptool_py/2.6.1/esptool.py
-ESP32_UPLOAD_OPTIONS=--before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 80m --flash_size detect 0xe000 $(ARDUINO_PACKAGES)/esp32/hardware/esp32/1.0.4/tools/partitions/boot_app0.bin 0x1000 $(ARDUINO_PACKAGES)/esp32/hardware/esp32/1.0.4/tools/sdk/bin/bootloader_qio_80m.bin 0x10000
+ARDUINO_HEX:=ino.bin
+ESP32_UPLOAD=$(PYTHON) $(ARDUINO_PACKAGES)/esp32/tools/esptool_py/$(ESP32_VERSION)/esptool.py
+ESP32_UPLOAD_OPTIONS=--before default_reset --after hard_reset write_flash -z --flash_mode $(ESP32_FLASHMODE) --flash_freq 80m --flash_size detect
+ESP32_UPLOAD_BOOTLOADER=$(ESP32_UPLOAD_OPTIONS) 0xe000 $(ESP32_HARDWARE)/tools/partitions/boot_app0.bin 0x1000 $(ESP32_HARDWARE)/tools/sdk/bin/bootloader_qio_80m.bin 0x10000
+ifeq ($(realpath partitions.csv),)
+ESP32_PARTFILE:=$(ESP32_HARDWARE)/tools/partitions/$(ESP32_PARTSCHEME).csv
+else
+ESP32_PARTFILE:=$(PWD)/partitions.csv
+ESP32_FILESYSTEM_PART:=spiffs
+endif
+ESP32_FILESYSTEM_PART?=$(ESP32_FILESYSTEM)
+FILESYSTEM_START:=$(shell grep $(ESP32_FILESYSTEM_PART) $(ESP32_PARTFILE) | awk -F',' '{print $$4}' | xargs printf "%d")
+FILESYSTEM_SIZE:=$(shell grep $(ESP32_FILESYSTEM_PART) $(ESP32_PARTFILE) | awk -F',' '{print $$5}' | xargs printf "%d")
 endif
 HOSTPROPS := $(shell find * -depth -maxdepth 0 -name $(HOSTNAME).mk -type f)
 ARDUINO_FQBN := $(if $(ARDUINO_FQBN),$(ARDUINO_FQBN),mega:cpu=atmega2560)
 UPLOAD_DEVICE := $(if $(UPLOAD_DEVICE),$(UPLOAD_DEVICE),atmega2560)
 BAUDRATE := $(if $(BAUDRATE),$(BAUDRATE),115200)
 SKETCH := $(if $(SKETCH),$(SKETCH),$(notdir $(CURDIR)))
-UNAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),Darwin)
-ARDUINO_ROOT=/Applications/Arduino.app/Contents/Java
-else
-ARDUINO_ROOT=/usr/share/arduino
-endif
 AVRDUDE_OPTS=
-ifeq ($(UPLOAD_DEVICE),atmega2560)
-AVRDUDE_OPTS+=-cwiring
-endif
+#ifeq ($(UPLOAD_DEVICE),atmega2560)
+#AVRDUDE_OPTS+=-cwiring
+#endif
 AVRSIM=simavr
 SYSTEM_LIBRARIES=$(ARDUINO_ROOT)/libraries
 PROJECT_LIBRARIES=../libraries
@@ -113,27 +142,77 @@ github_pull:
 		cd $(GITHUB_LIBPATH)/$$dir && git pull ; \
 	done
 
-.build/$(SKETCH).ino.hex: $(SKETCH).ino $(DEPENDS)
+ifeq ("$(TARGET)", "ESP32")
+.build/$(SKETCH).spiffs.bin: $(wildcard data/**/*)
+	@mkdir -p .build
+	@if [ -d "$(PWD)/data" ]; \
+	 then \
+		echo Packaging SPIFFS file system ; \
+		$(ARDUINO_PACKAGES)/esp32/tools/mkspiffs/0.2.3/mkspiffs -c $(PWD)/data -p 256 -b 4096 -s $(FILESYSTEM_SIZE) .build/$(SKETCH).spiffs.bin ; \
+	 fi
+
+.build/$(SKETCH).ffat.bin: $(wildcard data/**/*)
+	@mkdir -p .build
+	@if [ -d "$(PWD)/data" ]; \
+	 then \
+		echo Packaging FatFS file system ; \
+		$(ESP32_HARDWARE)/tools/mkfatfs -c $(PWD)/data -t fatfs -s $(FILESYSTEM_SIZE) .build/$(SKETCH).$(ESP32_FILESYSTEM).bin ; \
+	 fi
+
+.build/$(SKETCH).littlefs.bin: $(wildcard data/**/*)
+	@mkdir -p .build
+	@if [ -d "$(PWD)/data" ]; \
+	 then \
+		echo Packaging LittleFS file system ; \
+		echo $(ESP32_PARTFILE) ; \
+		echo $(ESP32_HARDWARE)/tools/mklittlefs -c $(PWD)/data -s $(FILESYSTEM_SIZE) .build/$(SKETCH).$(ESP32_FILESYSTEM).bin ; \
+		$(ESP32_HARDWARE)/tools/mklittlefs -c $(PWD)/data -s $(FILESYSTEM_SIZE) .build/$(SKETCH).$(ESP32_FILESYSTEM).bin ; \
+	 fi
+
+data: .build/$(SKETCH).$(ESP32_FILESYSTEM).bin
+else
+data:
+endif
+
+.build/$(SKETCH).$(ARDUINO_HEX): $(SKETCH).ino $(DEPENDS)
 	@mkdir -p .build
 	@echo $(BUILDER_CMD) -build-path $(PWD)/.build $(SKETCH).ino
 	@$(BUILDER_CMD) -build-path $(PWD)/.build $(SKETCH).ino
 
-build: github_clone .build/$(SKETCH).ino.hex
+build: github_clone data .build/$(SKETCH).$(ARDUINO_HEX)
 
-upload:
+ifneq ("$(ESP32_UPLOAD)", "")
+.build/$(SKETCH).$(ESP32_FILESYSTEM).bin.flashed: data
+	@if [ -d $(PWD)/data ]; \
+	then \
+		echo "\nUploading $(ESP32_FILESYSTEM) $(HOSTNAME)" ;\
+		echo $(ESP32_UPLOAD) --chip $(UPLOAD_DEVICE) --port $(PORT) --baud $(BAUDRATE) $(ESP32_UPLOAD_OPTIONS) $(FILESYSTEM_START) .build/$(SKETCH).$(ESP32_FILESYSTEM).bin ; \
+		$(ESP32_UPLOAD) --chip $(UPLOAD_DEVICE) --port $(PORT) --baud $(BAUDRATE) $(ESP32_UPLOAD_OPTIONS) $(FILESYSTEM_START) .build/$(SKETCH).$(ESP32_FILESYSTEM).bin ; \
+	fi
+	@touch .build/$(SKETCH).$(ESP32_FILESYSTEM).bin.flashed
+upload_data: .build/$(SKETCH).$(ESP32_FILESYSTEM).bin.flashed
+else
+upload_data:
+endif
+
+upload: upload_data
 ifneq ("$(SSH_UPLOAD_HOST)", "")
 	@echo "\nUploading to $(SSH_UPLOAD_HOST)"
-	scp .build/$(SKETCH).ino.hex $(SSH_UPLOAD_USER)@$(SSH_UPLOAD_HOST):roms
+	scp .build/$(SKETCH).$(ARDUINO_HEX) $(SSH_UPLOAD_USER)@$(SSH_UPLOAD_HOST):roms
 	ssh $(SSH_UPLOAD_USER)@$(SSH_UPLOAD_HOST) roms/flash.sh $(SKETCH) $(shell strings .build/$(SKETCH).ino.elf | grep -m 1 ReelTwoSMQ.h 2> /dev/null)
 	@echo
 else ifneq ("$(ESP32_UPLOAD)", "")
 	@echo "\nUploading on $(HOSTNAME)"
-	@echo $(ESP32_UPLOAD) --chip $(UPLOAD_DEVICE) --port $(PORT) --baud $(BAUDRATE) $(ESP32_UPLOAD_OPTIONS) .build/$(SKETCH).ino.bin 0x8000 .build/$(SKETCH).ino.partitions.bin 
-	@$(ESP32_UPLOAD) --chip $(UPLOAD_DEVICE) --port $(PORT) --baud $(BAUDRATE) $(ESP32_UPLOAD_OPTIONS) .build/$(SKETCH).ino.bin 0x8000 .build/$(SKETCH).ino.partitions.bin 
+	@echo $(ESP32_UPLOAD) --chip $(UPLOAD_DEVICE) --port $(PORT) --baud $(BAUDRATE) $(ESP32_UPLOAD_BOOTLOADER) .build/$(SKETCH).$(ARDUINO_HEX) 0x8000 .build/$(SKETCH).ino.partitions.bin
+	@$(ESP32_UPLOAD) --chip $(UPLOAD_DEVICE) --port $(PORT) --baud $(BAUDRATE) $(ESP32_UPLOAD_BOOTLOADER) .build/$(SKETCH).$(ARDUINO_HEX) 0x8000 .build/$(SKETCH).ino.partitions.bin
+	@echo
+else ifeq ("$(AVRDUDE_PROGRAMMER)", "-cusbtiny")
+	@echo "\nUploading on $(HOSTNAME)"
+	$(AVRDUDECMD) -p$(UPLOAD_DEVICE) $(AVRDUDE_PROGRAMMER) $(AVRDUDE_OPTS) -U flash:w:.build/$(SKETCH).$(ARDUINO_HEX):i
 	@echo
 else
 	@echo "\nUploading on $(HOSTNAME)"
-	$(AVRDUDECMD) -p$(UPLOAD_DEVICE) -carduino $(AVRDUDE_OPTS) -P$(PORT) -b$(BAUDRATE) -D -U flash:w:.build/$(SKETCH).ino.hex:i
+	$(AVRDUDECMD) -p$(UPLOAD_DEVICE) $(AVRDUDE_PROGRAMMER) $(AVRDUDE_OPTS) -P$(PORT) -b$(BAUDRATE) -D -U flash:w:.build/$(SKETCH).$(ARDUINO_HEX):i
 	@echo
 endif
 
