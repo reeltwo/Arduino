@@ -7,7 +7,8 @@ else
 ARDUINO_ROOT=/usr/share/arduino
 endif
 PYTHON=python
-ARDUINO_PACKAGES=$(HOME)/.arduino15/packages
+ARDUINO_DIR?=$(HOME)/.arduino15
+ARDUINO_PACKAGES=$(ARDUINO_DIR)/packages
 ARDUINO_BUILDER=$(ARDUINO_ROOT)/arduino-builder
 ARDUINO_HARDWARE=$(ARDUINO_ROOT)/hardware
 ARDUINO_TOOLS=$(ARDUINO_ROOT)/hardware/tools
@@ -37,6 +38,12 @@ UPLOAD_DEVICE:=atmega328pb
 BAUDRATE?=115200
 AVRDUDE:=$(AVRDUDE) -C+$(ARDUINO_PACKAGES)/pololu-a-star/hardware/avr/4.0.2/extra_avrdude.conf
 endif
+ifeq ("$(TARGET)", "PololuAStar16")
+ARDUINO_FQBN:=pololu-a-star:avr:a-star328PB:version=16mhz
+UPLOAD_DEVICE:=atmega328pb
+BAUDRATE?=115200
+AVRDUDE:=$(AVRDUDE) -C+$(ARDUINO_PACKAGES)/pololu-a-star/hardware/avr/4.0.2/extra_avrdude.conf
+endif
 ifeq ("$(TARGET)", "Uno")
 ARDUINO_FQBN:=$(ARDUINO_TARGET):uno
 UPLOAD_DEVICE:=atmega328p
@@ -53,17 +60,28 @@ ESP32_DEBUGLEVEL?=none
 ESP32_FLASHSIZE?=4M
 ESP32_FLASHFREQ?=80
 ESP32_FLASHMODE?=dio
-ESP32_VERSION?=3.0.0
-#ESP32_VERSION:=2.6.1
-ESP32_ARDUINO_VERSION?=1.0.5-rc6
-#ESP32_ARDUINO_VERSION:=1.0.4
+ESP32_ARDUINO_VERSION?=$(shell ls $(ARDUINO_PACKAGES)/esp32/hardware/esp32/)
+ifneq (,$(findstring 2.0.,$(ESP32_ARDUINO_VERSION)))
+ESP32_LOOPCORE_ID?=1
+ESP32_EVENTCORE_ID?=1
+ESP32_EXTRA_OPTIONS=,LoopCore=$(ESP32_LOOPCORE_ID),EventsCore=$(ESP32_EVENTCORE_ID)
+else
+ESP32_EXTRA_OPTIONS=
+endif
 ESP32_HARDWARE:=$(ARDUINO_PACKAGES)/esp32/hardware/esp32/$(ESP32_ARDUINO_VERSION)
-ESP32_OPTIONS:=PSRAM=$(ESP32_PSRAM),PartitionScheme=$(ESP32_PARTSCHEME),CPUFreq=$(ESP32_CPUFREQ),FlashMode=$(ESP32_FLASHMODE),FlashFreq=$(ESP32_FLASHFREQ),FlashSize=$(ESP32_FLASHSIZE),UploadSpeed=$(BAUDRATE),DebugLevel=$(ESP32_DEBUGLEVEL)
+ESP32_OPTIONS:=PartitionScheme=$(ESP32_PARTSCHEME),FlashMode=$(ESP32_FLASHMODE),FlashFreq=$(ESP32_FLASHFREQ),UploadSpeed=$(BAUDRATE),DebugLevel=$(ESP32_DEBUGLEVEL)$(ESP32_EXTRA_OPTIONS)
+#ARDUINO_FQBN:=esp32:esp32:esp32wrover:$(ESP32_OPTIONS)
 ARDUINO_FQBN:=esp32:esp32:esp32:$(ESP32_OPTIONS)
 ARDUINO_HEX:=ino.bin
-ESP32_UPLOAD=$(PYTHON) $(ARDUINO_PACKAGES)/esp32/tools/esptool_py/$(ESP32_VERSION)/esptool.py
+ifneq ($(wildcard $(ESP32_HARDWARE)/tools/sdk/bin),)
+ESP32_HARDWARE_BINPATH=$(ESP32_HARDWARE)/tools/sdk/bin
+else
+ESP32_HARDWARE_BINPATH=$(ESP32_HARDWARE)/tools/sdk/$(UPLOAD_DEVICE)/bin
+endif
+ESP32_UPLOAD_VERSION?=$(shell ls $(ARDUINO_PACKAGES)/esp32/tools/esptool_py/)
+ESP32_UPLOAD=$(PYTHON) $(ARDUINO_PACKAGES)/esp32/tools/esptool_py/$(ESP32_UPLOAD_VERSION)/esptool.py
 ESP32_UPLOAD_OPTIONS=--before default_reset --after hard_reset write_flash -z --flash_mode $(ESP32_FLASHMODE) --flash_freq 80m --flash_size detect
-ESP32_UPLOAD_BOOTLOADER=$(ESP32_UPLOAD_OPTIONS) 0xe000 $(ESP32_HARDWARE)/tools/partitions/boot_app0.bin 0x1000 $(ESP32_HARDWARE)/tools/sdk/bin/bootloader_qio_80m.bin 0x10000
+ESP32_UPLOAD_BOOTLOADER=$(ESP32_UPLOAD_OPTIONS) 0xe000 $(ESP32_HARDWARE)/tools/partitions/boot_app0.bin 0x1000 $(ESP32_HARDWARE_BINPATH)/bootloader_qio_80m.bin 0x10000
 ifeq ($(realpath partitions.csv),)
 ESP32_PARTFILE:=$(ESP32_HARDWARE)/tools/partitions/$(ESP32_PARTSCHEME).csv
 else
@@ -85,7 +103,7 @@ AVRDUDE_OPTS=
 #endif
 AVRSIM=simavr
 SYSTEM_LIBRARIES=$(ARDUINO_ROOT)/libraries
-PROJECT_LIBRARIES=../libraries
+PROJECT_LIBRARIES?=../libraries
 GITHUB_LIBPATH=$(PROJECT_LIBRARIES)/github.com
 ENSURE_DIR := $(shell mkdir -p $(GITHUB_LIBPATH))
 ifneq ("$(GITHUB_REPOS)","")
@@ -95,6 +113,20 @@ GITHUB_EMPTYDIRS+=$(sort $(shell cd $(GITHUB_LIBPATH) && find * -depth -maxdepth
 GITHUB_POPULATEDIRS=$(sort $(shell cd $(GITHUB_LIBPATH) && find * -depth -mindepth 1 -maxdepth 1 -type d -not -empty 2> /dev/null))
 GITHUB_DIRS=$(shell cd $(GITHUB_LIBPATH) && find * -depth -maxdepth 0 -type d 2> /dev/null )
 GITHUB_LIBRARIES:=$(addprefix -libraries $(GITHUB_LIBPATH)/,$(GITHUB_DIRS))
+ifneq ($(wildcard .git),)
+GITHASH=$(shell git log -n 1 --pretty="%h")
+GITREPO_URL=$(shell git config --get remote.origin.url)
+GITREPO_URL_TYPE=$(shell echo $(GITREPO_URL) | awk -F ":" '{print $$1}')
+GITREPO_URL_REMAINDER=$(shell echo $(GITREPO_URL) | awk -F ":" '{print $$2}')
+ifneq ("$(GITREPO_URL_TYPE)","https")
+GITREPO_URL_HOST:=$(shell echo $(GITREPO_URL_TYPE) | awk -F "@" '{print $$2}')
+GITREPO_URL_REMAINDER:=$(shell echo $(GITREPO_URL_REMAINDER) | sed -e "s/.git$$//")
+GITREPO_URL:=https://$(GITREPO_URL_HOST)/$(GITREPO_URL_REMAINDER)
+endif
+BUILD_VERSION_FILE=build_version.h
+else
+BUILD_VERSION_FILE=
+endif
 ARDUINO_OPTS=-warnings all
 ifeq ("$(VERBOSE)","1")
 ARDUINO_OPTS += -verbose
@@ -130,6 +162,31 @@ DEPENDS=$(shell tail -n +2 .build/sketch/$(SKETCH).ino.cpp.d 2> /dev/null | perl
 
 all: build
 
+ifdef BUILD_VERSION_FILE
+build_version.h:
+	@echo '#define BUILD_VERSION "$(GITREPO_URL)/tree/$(GITHASH)"' > $(BUILD_VERSION_FILE)
+endif
+
+requirements.txt:
+	@echo "## Libraries Used" > requirements.txt ; \
+	echo "" >> requirements.txt ; \
+	echo "<ul>" >> requirements.txt ; \
+	for dir in $(GITHUB_REPOS) ; do \
+		echo "<li>"https://github.com/$$dir"</li>" >> requirements.txt ; \
+	done
+	echo "</ul>" >> requirements.txt ; \
+	start='## Libraries Used' ; \
+	end='<\/ul>' ; \
+	replacement='## REQUIREMENTS' ; \
+	mkdir -p .build ; \
+	if [ -f README.md ]; then \
+		cat README.md | sed -e "/^ *$$start/,/^ *$$end/c$$replacement" | sed -e "/$$replacement/{r requirements.txt" -e 'd}' > .build/README.md ; \
+		diff README.md .build/README.md > /dev/null ; \
+		if [ $$? -eq 1 ]; then  \
+			cp -f .build/README.md README.md ; \
+		fi \
+	fi
+
 github_clone:
 	@for dir in $(GITHUB_EMPTYDIRS) ; do \
 		echo Cloning : https://github.com/$$dir ; \
@@ -143,7 +200,7 @@ github_pull:
 	done
 
 ifeq ("$(TARGET)", "ESP32")
-.build/$(SKETCH).spiffs.bin: $(wildcard data/**/*)
+.build/$(SKETCH).spiffs.bin: $(wildcard data/*)
 	@mkdir -p .build
 	@if [ -d "$(PWD)/data" ]; \
 	 then \
@@ -151,7 +208,7 @@ ifeq ("$(TARGET)", "ESP32")
 		$(ARDUINO_PACKAGES)/esp32/tools/mkspiffs/0.2.3/mkspiffs -c $(PWD)/data -p 256 -b 4096 -s $(FILESYSTEM_SIZE) .build/$(SKETCH).spiffs.bin ; \
 	 fi
 
-.build/$(SKETCH).ffat.bin: $(wildcard data/**/*)
+.build/$(SKETCH).ffat.bin: $(wildcard data/*)
 	@mkdir -p .build
 	@if [ -d "$(PWD)/data" ]; \
 	 then \
@@ -159,7 +216,7 @@ ifeq ("$(TARGET)", "ESP32")
 		$(ESP32_HARDWARE)/tools/mkfatfs -c $(PWD)/data -t fatfs -s $(FILESYSTEM_SIZE) .build/$(SKETCH).$(ESP32_FILESYSTEM).bin ; \
 	 fi
 
-.build/$(SKETCH).littlefs.bin: $(wildcard data/**/*)
+.build/$(SKETCH).littlefs.bin: $(wildcard data/*)
 	@mkdir -p .build
 	@if [ -d "$(PWD)/data" ]; \
 	 then \
@@ -179,7 +236,7 @@ endif
 	@echo $(BUILDER_CMD) -build-path $(PWD)/.build $(SKETCH).ino
 	@$(BUILDER_CMD) -build-path $(PWD)/.build $(SKETCH).ino
 
-build: github_clone data .build/$(SKETCH).$(ARDUINO_HEX)
+build: github_clone data $(BUILD_VERSION_FILE) requirements.txt .build/$(SKETCH).$(ARDUINO_HEX)
 
 ifneq ("$(ESP32_UPLOAD)", "")
 .build/$(SKETCH).$(ESP32_FILESYSTEM).bin.flashed: data
@@ -226,4 +283,4 @@ debug:
 	@$(AVRSIM) -m $(UPLOAD_DEVICE) -g .build/$(SKETCH).ino.elf
 
 clean:
-	@rm -rf $(PWD)/.build
+	@rm -rf $(PWD)/.build $(PWD)/.lib requirements.txt $(BUILD_VERSION_FILE)
