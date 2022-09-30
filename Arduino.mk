@@ -22,33 +22,41 @@ AVRDUDE_PROGRAMMER?=-carduino
 endif
 ARDUINO_TARGET:=arduino:avr
 ARDUINO_HEX:=ino.hex
+
 ifeq ("$(TARGET)", "Mega2560")
 ARDUINO_FQBN:=$(ARDUINO_TARGET):mega:cpu=atmega2560
 UPLOAD_DEVICE:=atmega2560
 BAUDRATE?=115200
 endif
+
 ifeq ("$(TARGET)", "ProMini")
 ARDUINO_FQBN:=$(ARDUINO_TARGET):pro:cpu=16MHzatmega328
 UPLOAD_DEVICE:=atmega328p
 BAUDRATE?=57600
 endif
+
 ifeq ("$(TARGET)", "PololuAStar20")
 ARDUINO_FQBN:=pololu-a-star:avr:a-star328PB:version=20mhz
 UPLOAD_DEVICE:=atmega328pb
 BAUDRATE?=115200
 AVRDUDE:=$(AVRDUDE) -C+$(ARDUINO_PACKAGES)/pololu-a-star/hardware/avr/4.0.2/extra_avrdude.conf
 endif
+
 ifeq ("$(TARGET)", "PololuAStar16")
 ARDUINO_FQBN:=pololu-a-star:avr:a-star328PB:version=16mhz
 UPLOAD_DEVICE:=atmega328pb
 BAUDRATE?=115200
 AVRDUDE:=$(AVRDUDE) -C+$(ARDUINO_PACKAGES)/pololu-a-star/hardware/avr/4.0.2/extra_avrdude.conf
 endif
+
 ifeq ("$(TARGET)", "Uno")
 ARDUINO_FQBN:=$(ARDUINO_TARGET):uno
 UPLOAD_DEVICE:=atmega328p
 BAUDRATE?=115200
 endif
+
+#######################################
+
 ifeq ("$(TARGET)", "ESP32")
 UPLOAD_DEVICE:=esp32
 BAUDRATE?=921600
@@ -83,15 +91,107 @@ ESP32_UPLOAD=$(PYTHON) $(ARDUINO_PACKAGES)/esp32/tools/esptool_py/$(ESP32_UPLOAD
 ESP32_UPLOAD_OPTIONS=--before default_reset --after hard_reset write_flash -z --flash_mode $(ESP32_FLASHMODE) --flash_freq 80m --flash_size detect
 ESP32_UPLOAD_BOOTLOADER=$(ESP32_UPLOAD_OPTIONS) 0xe000 $(ESP32_HARDWARE)/tools/partitions/boot_app0.bin 0x1000 $(ESP32_HARDWARE_BINPATH)/bootloader_qio_80m.bin 0x10000
 ifeq ($(realpath partitions.csv),)
-ESP32_PARTFILE:=$(ESP32_HARDWARE)/tools/partitions/$(ESP32_PARTSCHEME).csv
+ESP32_PARTFILE?=$(ESP32_HARDWARE)/tools/partitions/$(ESP32_PARTSCHEME).csv
 else
-ESP32_PARTFILE:=$(PWD)/partitions.csv
-ESP32_FILESYSTEM_PART:=spiffs
+ESP32_PARTFILE?=$(PWD)/partitions.csv
+ESP32_FILESYSTEM_PART?=spiffs
 endif
 ESP32_FILESYSTEM_PART?=$(ESP32_FILESYSTEM)
 FILESYSTEM_START:=$(shell grep $(ESP32_FILESYSTEM_PART) $(ESP32_PARTFILE) | awk -F',' '{print $$4}' | xargs printf "%d")
 FILESYSTEM_SIZE:=$(shell grep $(ESP32_FILESYSTEM_PART) $(ESP32_PARTFILE) | awk -F',' '{print $$5}' | xargs printf "%d")
 endif
+
+#######################################
+### TODO MERGE WITH ABOVE
+#######################################
+ifeq ("$(TARGET)", "ESP32S3")
+UPLOAD_DEVICE:=esp32s3
+BAUDRATE?=921600
+ESP32_CPUFREQ?=240
+ESP32_PSRAM?=disabled
+ESP32_FILESYSTEM?=spiffs
+ESP32_PARTSCHEME?=min_spiffs
+ESP32_DEBUGLEVEL?=none
+ESP32_FLASHSIZE?=detect
+ESP32_FLASHMODE?=dio
+ESP32S3_USBMODE?=hwcdc
+ESP32S3_CDCONBOOT?=default
+ESP32S3_MSCONBOOT?=default
+ESP32S3_DFUONBOOT?=default
+ESP32S3_UPLOADMODE?=default
+ESP32_ARDUINO_VERSION?=$(shell ls $(ARDUINO_PACKAGES)/esp32/hardware/esp32/)
+ifneq (,$(findstring 2.0.,$(ESP32_ARDUINO_VERSION)))
+ESP32_LOOPCORE_ID?=1
+ESP32_EVENTCORE_ID?=1
+ESP32_EXTRA_OPTIONS=,LoopCore=$(ESP32_LOOPCORE_ID),EventsCore=$(ESP32_EVENTCORE_ID)
+else
+ESP32_EXTRA_OPTIONS=
+endif
+ESP32S_EXTRA_OPTIONS=,USBMode=$(ESP32S3_USBMODE),CDCOnBoot=$(ESP32S3_CDCONBOOT),MSCOnBoot=$(ESP32S3_MSCONBOOT),DFUOnBoot=$(ESP32S3_DFUONBOOT),UploadMode=$(ESP32S3_UPLOADMODE)
+ESP32_HARDWARE:=$(ARDUINO_PACKAGES)/esp32/hardware/esp32/$(ESP32_ARDUINO_VERSION)
+ESP32_OPTIONS:=PSRAM=$(ESP32_PSRAM),PartitionScheme=$(ESP32_PARTSCHEME),FlashMode=$(ESP32_FLASHMODE),UploadSpeed=$(BAUDRATE),DebugLevel=$(ESP32_DEBUGLEVEL)$(ESP32_EXTRA_OPTIONS)$(ESP32S_EXTRA_OPTIONS)
+#ARDUINO_FQBN:=esp32:esp32:esp32wrover:$(ESP32_OPTIONS)
+ARDUINO_FQBN:=esp32:esp32:esp32s3:$(ESP32_OPTIONS)
+ARDUINO_HEX:=ino.bin
+ifneq ($(wildcard $(ESP32_HARDWARE)/tools/sdk/bin),)
+ESP32_HARDWARE_BINPATH=$(ESP32_HARDWARE)/tools/sdk/bin
+else
+ESP32_HARDWARE_BINPATH=$(ESP32_HARDWARE)/tools/sdk/$(UPLOAD_DEVICE)/bin
+endif
+ESP32_UPLOAD=$(PYTHON) $(ARDUINO_PACKAGES)/esp32/hardware/esp32/$(ESP32_ARDUINO_VERSION)/tools/esptool.py
+ESP32_UPLOAD_OPTIONS=--before default_reset --after hard_reset write_flash -z --flash_mode $(ESP32_FLASHMODE) --flash_freq 80m --flash_size $(ESP32_FLASHSIZE)
+ESP32_UPLOAD_BOOTLOADER=$(ESP32_UPLOAD_OPTIONS) 0xe000 $(ESP32_HARDWARE)/tools/partitions/boot_app0.bin 0x0000 $(ESP32_HARDWARE_BINPATH)/bootloader_$(ESP32_FLASHMODE)_80m.bin 0x10000
+ifeq ($(realpath partitions.csv),)
+ESP32_PARTFILE?=$(ESP32_HARDWARE)/tools/partitions/$(ESP32_PARTSCHEME).csv
+else
+ESP32_PARTFILE?=$(PWD)/partitions.csv
+ESP32_FILESYSTEM_PART?=spiffs
+endif
+ESP32_FILESYSTEM_PART?=$(ESP32_FILESYSTEM)
+FILESYSTEM_START:=$(shell grep $(ESP32_FILESYSTEM_PART) $(ESP32_PARTFILE) | awk -F',' '{print $$4}' | xargs printf "%d")
+FILESYSTEM_SIZE:=$(shell grep $(ESP32_FILESYSTEM_PART) $(ESP32_PARTFILE) | awk -F',' '{print $$5}' | xargs printf "%d")
+endif
+
+#######################################
+### TODO MERGE WITH ABOVE
+#######################################
+ifeq ("$(TARGET)", "PICO32")
+UPLOAD_DEVICE:=esp32
+BAUDRATE?=921600
+ESP32_CPUFREQ?=240
+ESP32_PSRAM?=disabled
+ESP32_FILESYSTEM?=spiffs
+ESP32_PARTSCHEME?=default
+ESP32_DEBUGLEVEL?=none
+ESP32_FLASHSIZE?=4MB
+ESP32_FLASHMODE?=dio
+ESP32_ARDUINO_VERSION?=$(shell ls $(ARDUINO_PACKAGES)/esp32/hardware/esp32/)
+ESP32_EXTRA_OPTIONS=
+ESP32_HARDWARE:=$(ARDUINO_PACKAGES)/esp32/hardware/esp32/$(ESP32_ARDUINO_VERSION)
+ESP32_OPTIONS:=PartitionScheme=$(ESP32_PARTSCHEME),UploadSpeed=$(BAUDRATE),DebugLevel=$(ESP32_DEBUGLEVEL)
+ARDUINO_FQBN:=esp32:esp32:pico32:$(ESP32_OPTIONS)
+ARDUINO_HEX:=ino.bin
+ifneq ($(wildcard $(ESP32_HARDWARE)/tools/sdk/bin),)
+ESP32_HARDWARE_BINPATH=$(ESP32_HARDWARE)/tools/sdk/bin
+else
+ESP32_HARDWARE_BINPATH=$(ESP32_HARDWARE)/tools/sdk/$(UPLOAD_DEVICE)/bin
+endif
+ESP32_UPLOAD_VERSION?=$(shell ls $(ARDUINO_PACKAGES)/esp32/tools/esptool_py/)
+ESP32_UPLOAD=$(PYTHON) $(ARDUINO_PACKAGES)/esp32/tools/esptool_py/$(ESP32_UPLOAD_VERSION)/esptool.py
+ESP32_UPLOAD_OPTIONS=--before default_reset --after hard_reset write_flash -z --flash_mode $(ESP32_FLASHMODE) --flash_freq 80m --flash_size $(ESP32_FLASHSIZE)
+ESP32_UPLOAD_BOOTLOADER=$(ESP32_UPLOAD_OPTIONS) 0xe000 $(ESP32_HARDWARE)/tools/partitions/boot_app0.bin 0x1000 .build/$(SKETCH).ino.bootloader.bin 0x10000
+ifeq ($(realpath partitions.csv),)
+ESP32_PARTFILE?=$(ESP32_HARDWARE)/tools/partitions/$(ESP32_PARTSCHEME).csv
+else
+ESP32_PARTFILE?=$(PWD)/partitions.csv
+ESP32_FILESYSTEM_PART?=spiffs
+endif
+ESP32_FILESYSTEM_PART?=$(ESP32_FILESYSTEM)
+FILESYSTEM_START:=$(shell grep $(ESP32_FILESYSTEM_PART) $(ESP32_PARTFILE) | awk -F',' '{print $$4}' | xargs printf "%d")
+FILESYSTEM_SIZE:=$(shell grep $(ESP32_FILESYSTEM_PART) $(ESP32_PARTFILE) | awk -F',' '{print $$5}' | xargs printf "%d")
+endif
+#######################################
+
 HOSTPROPS := $(shell find * -depth -maxdepth 0 -name $(HOSTNAME).mk -type f)
 ARDUINO_FQBN := $(if $(ARDUINO_FQBN),$(ARDUINO_FQBN),mega:cpu=atmega2560)
 UPLOAD_DEVICE := $(if $(UPLOAD_DEVICE),$(UPLOAD_DEVICE),atmega2560)
@@ -113,6 +213,7 @@ GITHUB_EMPTYDIRS+=$(sort $(shell cd $(GITHUB_LIBPATH) && find * -depth -maxdepth
 GITHUB_POPULATEDIRS=$(sort $(shell cd $(GITHUB_LIBPATH) && find * -depth -mindepth 1 -maxdepth 1 -type d -not -empty 2> /dev/null))
 GITHUB_DIRS=$(shell cd $(GITHUB_LIBPATH) && find * -depth -maxdepth 0 -type d 2> /dev/null )
 GITHUB_LIBRARIES:=$(addprefix -libraries $(GITHUB_LIBPATH)/,$(GITHUB_DIRS))
+
 ifneq ($(wildcard .git),)
 GITHASH=$(shell git log -n 1 --pretty="%h")
 GITREPO_URL=$(shell git config --get remote.origin.url)
@@ -127,7 +228,23 @@ BUILD_VERSION_FILE=build_version.h
 else
 BUILD_VERSION_FILE=
 endif
-ARDUINO_OPTS=-warnings all
+
+ifneq ($(wildcard $(GITHUB_LIBPATH)/reeltwo/Reeltwo/.git),)
+REELTWO_GITHASH=$(shell cd $(GITHUB_LIBPATH)/reeltwo/Reeltwo && git log -n 1 --pretty="%h")
+REELTWO_GITREPO_URL=$(shell cd $(GITHUB_LIBPATH)/reeltwo/Reeltwo && git config --get remote.origin.url)
+REELTWO_GITREPO_URL_TYPE=$(shell cd $(GITHUB_LIBPATH)/reeltwo/Reeltwo && echo $(REELTWO_GITREPO_URL) | awk -F ":" '{print $$1}')
+REELTWO_GITREPO_URL_REMAINDER=$(shell cd $(GITHUB_LIBPATH)/reeltwo/Reeltwo && echo $(REELTWO_GITREPO_URL) | awk -F ":" '{print $$2}')
+ifneq ("$(REELTWO_GITREPO_URL_TYPE)","https")
+REELTWO_GITREPO_URL_HOST:=$(shell cd $(GITHUB_LIBPATH)/reeltwo/Reeltwo && echo $(REELTWO_GITREPO_URL_TYPE) | awk -F "@" '{print $$2}')
+REELTWO_GITREPO_URL_REMAINDER:=$(shell cd $(GITHUB_LIBPATH)/reeltwo/Reeltwo && echo $(REELTWO_GITREPO_URL_REMAINDER) | sed -e "s/.git$$//")
+REELTWO_GITREPO_URL:=https://$(REELTWO_GITREPO_URL_HOST)/$(REELTWO_GITREPO_URL_REMAINDER)
+endif
+REELTWO_BUILD_VERSION_FILE=reeltwo_build_version.h
+else
+REELTWO_BUILD_VERSION_FILE=
+endif
+
+ARDUINO_OPTS += -warnings all
 ifeq ("$(VERBOSE)","1")
 ARDUINO_OPTS += -verbose
 AVRDUDE_OPTS += -v
@@ -167,6 +284,11 @@ build_version.h:
 	@echo '#define BUILD_VERSION "$(GITREPO_URL)/tree/$(GITHASH)"' > $(BUILD_VERSION_FILE)
 endif
 
+ifdef REELTWO_BUILD_VERSION_FILE
+reeltwo_build_version.h:
+	@echo '#define REELTWO_BUILD_VERSION "$(REELTWO_GITREPO_URL)/tree/$(REELTWO_GITHASH)"' > $(REELTWO_BUILD_VERSION_FILE)
+endif
+
 requirements.txt:
 	@echo "## Libraries Used" > requirements.txt ; \
 	echo "" >> requirements.txt ; \
@@ -199,7 +321,7 @@ github_pull:
 		cd $(GITHUB_LIBPATH)/$$dir && git pull ; \
 	done
 
-ifeq ("$(TARGET)", "ESP32")
+ifneq ("$(ESP32_UPLOAD)", "")
 .build/$(SKETCH).spiffs.bin: $(wildcard data/*)
 	@mkdir -p .build
 	@if [ -d "$(PWD)/data" ]; \
@@ -236,7 +358,7 @@ endif
 	@echo $(BUILDER_CMD) -build-path $(PWD)/.build $(SKETCH).ino
 	@$(BUILDER_CMD) -build-path $(PWD)/.build $(SKETCH).ino
 
-build: github_clone data $(BUILD_VERSION_FILE) requirements.txt .build/$(SKETCH).$(ARDUINO_HEX)
+build: github_clone data $(BUILD_VERSION_FILE) $(REELTWO_BUILD_VERSION_FILE) requirements.txt .build/$(SKETCH).$(ARDUINO_HEX)
 
 ifneq ("$(ESP32_UPLOAD)", "")
 .build/$(SKETCH).$(ESP32_FILESYSTEM).bin.flashed: data
