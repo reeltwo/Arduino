@@ -3,11 +3,12 @@ HOSTNAME := $(shell hostname -s)
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
 ARDUINO_ROOT=/Applications/Arduino.app/Contents/Java
+ARDUINO_DIR?=$(HOME)/Library/Arduino15
 else
 ARDUINO_ROOT=/usr/share/arduino
+ARDUINO_DIR?=$(HOME)/.arduino15
 endif
 PYTHON=python
-ARDUINO_DIR?=$(HOME)/.arduino15
 ARDUINO_PACKAGES=$(ARDUINO_DIR)/packages
 ARDUINO_BUILDER=$(ARDUINO_ROOT)/arduino-builder
 ARDUINO_HARDWARE=$(ARDUINO_ROOT)/hardware
@@ -68,7 +69,11 @@ endif
 ESP32_DATADEPEND?=
 ifeq ("$(TARGET)", "ESP32")
 UPLOAD_DEVICE:=esp32
+ifeq ($(UNAME_S),Darwin)
+BAUDRATE?=460800
+else
 BAUDRATE?=921600
+endif
 ESP32_DATA?=data
 ESP32_CPUFREQ?=240
 ESP32_PSRAM?=disabled
@@ -337,9 +342,6 @@ ifneq ("$(ESP32_UPLOAD)", "")
 	@if [ -d "$(PWD)/$(ESP32_DATA)" ]; \
 	 then \
 		echo Packaging SPIFFS file system ; \
-		echo ESP32_FILESYSTEM_PART: $(ESP32_FILESYSTEM) ; \
-		echo ESP32_PARTFILE: $(ESP32_PARTFILE) ; \
-		echo ESP32_FILESYSTEM_PART: $(ESP32_FILESYSTEM_PART) ; \
 		echo $(ARDUINO_PACKAGES)/esp32/tools/mkspiffs/0.2.3/mkspiffs -c $(PWD)/$(ESP32_DATA) -p 256 -b 4096 -s $(FILESYSTEM_SIZE) .build/$(SKETCH).spiffs.bin ; \
 		$(ARDUINO_PACKAGES)/esp32/tools/mkspiffs/0.2.3/mkspiffs -c $(PWD)/$(ESP32_DATA) -p 256 -b 4096 -s $(FILESYSTEM_SIZE) .build/$(SKETCH).spiffs.bin ; \
 	 fi
@@ -428,3 +430,6 @@ debug:
 
 clean:
 	@rm -rf $(PWD)/.build $(PWD)/.lib requirements.txt $(BUILD_VERSION_FILE)
+
+clean_data:
+	@rm -f .build/$(SKETCH).$(ESP32_FILESYSTEM).bin .build/$(SKETCH).$(ESP32_FILESYSTEM).bin.flashed
