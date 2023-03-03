@@ -82,6 +82,10 @@ RP2040_OPTIONS=flash=$(RP2040_FLASHSIZE)_0,freq=$(RP2040_FREQ),opt=$(RP2040_OPT)
 ARDUINO_FQBN:=$(TARGET_CORE):$(TARGET_CORE):$(TARGET_BOARD):$(RP2040_OPTIONS)
 UPLOAD_DEVICE:=rp2040
 BAUDRATE?=115200
+RP2040_UPLOAD_VERSION?=$(shell ls $(ARDUINO_PACKAGES)/rp2040/tools/pqt-python3/)
+RP2040_UPLOAD?=$(PYTHON) $(ARDUINO_PACKAGES)/rp2040/tools/pqt-python3/$(RP2040_UPLOAD_VERSION)/python3
+RP2040_UPLOAD_TOOLS_VERSION?=$(shell ls $(ARDUINO_PACKAGES)/rp2040/hardware/rp2040/)
+RP2040_UPLOAD_OPTIONS?=-I $(ARDUINO_PACKAGES)/rp2040/hardware/rp2040/$(RP2040_UPLOAD_TOOLS_VERSION)/tools/uf2conv.py
 endif
 
 #######################################
@@ -431,6 +435,11 @@ ifneq ("$(SSH_UPLOAD_HOST)", "")
 	@echo "\nUploading to $(SSH_UPLOAD_HOST)"
 	scp .build/$(SKETCH).$(ARDUINO_HEX) $(SSH_UPLOAD_USER)@$(SSH_UPLOAD_HOST):roms
 	ssh $(SSH_UPLOAD_USER)@$(SSH_UPLOAD_HOST) roms/flash.sh $(SKETCH) $(shell strings .build/$(SKETCH).ino.elf | grep -m 1 ReelTwoSMQ.h 2> /dev/null)
+	@echo
+else ifneq ("$(RP2040_UPLOAD)", "")
+	@echo "\nUploading on $(HOSTNAME)"
+	@echo $(RP2040_UPLOAD) $(RP2040_UPLOAD_OPTIONS) --serial $(PORT) --family $(TARGET) --deploy .build/$(SKETCH).ino.uf2
+	@$(RP2040_UPLOAD) $(RP2040_UPLOAD_OPTIONS) --serial $(PORT) --family $(TARGET) --deploy .build/$(SKETCH).ino.uf2
 	@echo
 else ifneq ("$(ESP32_UPLOAD)", "")
 	@echo "\nUploading on $(HOSTNAME)"
